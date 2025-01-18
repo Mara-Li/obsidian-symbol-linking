@@ -1,3 +1,8 @@
+## [1.3.1](https://github.com/Mara-Li/obsidian-at-symbol-linking/compare/1.3.0...1.3.1) (2025-01-18)
+### Bug Fixes
+
+* **mono-file:** alias should be set when the heading exists ([966328d](https://github.com/Mara-Li/obsidian-at-symbol-linking/commit/966328d1742b25699162504e6cd192b05d9f747f))
+
 ## [1.3.0](https://github.com/Mara-Li/obsidian-at-symbol-linking/compare/1.2.0...1.3.0) (2025-01-18)
 ### Features
 
