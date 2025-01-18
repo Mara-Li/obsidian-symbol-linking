@@ -126,7 +126,16 @@ export function sharedGetMonoFileSuggestion(
 	const options: FileOption[] = [];
 	for (const file of files) {
 		const meta = app.metadataCache.getFileCache(file);
-		if (!meta || !meta.headings) return [];
+		if (!meta || !meta.headings) {
+			options.push({
+				isCreateNewOption: true,
+				query,
+				fileName: originalQuery,
+				filePath: file.path,
+				alias: originalQuery,
+			});
+			continue;
+		}
 
 		const heading =
 			settings.headerLevelForContact === 0
@@ -168,6 +177,7 @@ export function sharedGetMonoFileSuggestion(
 						query,
 						fileName: originalQuery,
 						filePath: file.path,
+						alias: originalQuery,
 					},
 				});
 			}
