@@ -151,6 +151,8 @@ export function sharedGetMonoFileSuggestion(
 		const option: FileOption[] = heading.map((heading) => ({
 			fileName: heading.heading,
 			filePath: file.path,
+			originalAlias: heading.heading,
+			alias: settings.removeAccents ? removeAccents(heading.heading) : heading.heading,
 		}));
 		options.push(...option);
 	}
