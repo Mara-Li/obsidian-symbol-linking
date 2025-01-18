@@ -41,7 +41,10 @@ export function sharedGetSuggestions(
 			options.push({
 				fileName,
 				filePath: file.path,
-				alias: meta.frontmatter.alias,
+				alias: settings.removeAccents
+					? removeAccents(meta.frontmatter.alias)
+					: meta.frontmatter.alias,
+				originalAlias: settings.removeAccents ? meta.frontmatter.alias : undefined,
 			});
 		} else if (meta?.frontmatter?.aliases) {
 			let aliases = meta.frontmatter.aliases;
@@ -53,6 +56,7 @@ export function sharedGetSuggestions(
 					fileName,
 					filePath: file.path,
 					alias: settings.removeAccents ? removeAccents(alias) : alias,
+					originalAlias: settings.removeAccents ? alias : undefined,
 				});
 			}
 		}
@@ -132,7 +136,8 @@ export function sharedGetMonoFileSuggestion(
 				query,
 				fileName: originalQuery,
 				filePath: file.path,
-				alias: originalQuery,
+				alias: query,
+				originalAlias: originalQuery,
 			});
 			continue;
 		}
@@ -177,7 +182,8 @@ export function sharedGetMonoFileSuggestion(
 						query,
 						fileName: originalQuery,
 						filePath: file.path,
-						alias: originalQuery,
+						alias: query,
+						originalAlias: originalQuery,
 					},
 				});
 			}

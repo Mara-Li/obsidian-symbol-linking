@@ -66,10 +66,10 @@ export async function sharedSelectSuggestion(
 	if (!linkFile) {
 		linkFile = app.vault.getAbstractFileByPath(value.obj?.filePath) as TFile;
 	}
-	let alias = value.obj?.alias || "";
+	let alias = value.obj?.originalAlias || "";
 	const aliasFallBack =
 		settings.limitToFile.length > 0
-			? originalQuery ?? value.obj?.fileName
+			? (originalQuery ?? value.obj?.fileName)
 			: value.obj?.fileName;
 	if (settings.includeSymbol) alias = `${typedChar}${alias || aliasFallBack}`;
 	const linkText =

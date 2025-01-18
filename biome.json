@@ -15,12 +15,22 @@
 			},
 			"style": {
 				"noVar": "error",
-				"useFilenamingConvention": "error",
+				"useFilenamingConvention": "off",
 				"useImportType": "error",
 				"useNamingConvention": {
 					"level": "warn",
 					"options": {
-						"strictCase": false
+						"strictCase": false,
+						"enumMemberCase": "CONSTANT_CASE",
+						"conventions": [
+							{
+								"selector": {
+									"kind": "enumMember",
+									"scope": "global"
+								},
+								"formats": ["CONSTANT_CASE"]
+							}
+						]
 					}
 				},
 				"useTemplate": "warn",
