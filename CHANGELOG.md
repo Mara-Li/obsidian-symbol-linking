@@ -1,3 +1,12 @@
+## [1.3.0](https://github.com/Mara-Li/obsidian-at-symbol-linking/compare/1.2.0...1.3.0) (2025-01-18)
+### Features
+
+* set alias for monofile suggestion + merge ([6a526bf](https://github.com/Mara-Li/obsidian-at-symbol-linking/commit/6a526bf3272175a5de27b6c1e0bb13953dbbde39))
+
+### Bug Fixes
+
+* set alias for monofile suggestion ([e4b7c35](https://github.com/Mara-Li/obsidian-at-symbol-linking/commit/e4b7c35187a8c66467de792f2ab48ccff97e84c8))
+
 ## [1.2.0](https://github.com/Mara-Li/obsidian-custom-suggester/compare/1.0.2...1.2.0) (2024-11-06)
 ### Features
 
