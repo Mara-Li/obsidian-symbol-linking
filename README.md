@@ -15,7 +15,14 @@ The plugin uses the link type specified by your Obsidian `"Files & Links" -> "Us
 ### Linking to directories/files
 You can limit links to:
  - From specific directories, like your `People/` directory.
- - **Or** from **specific files**, like your `People.md` file. You can configure the level heading using the slider. 
+ - **Or** from **specific files**, like your `People.md` file. You can configure the level heading using the slider.
+
+#### Folder linking
+
+The folder linking also includes the option to limits or add more extensions. You can set up multiple extension as a list, on the form of `md, pdf, jpg, jpeg`. Separate the extension by a comma, a space or a new lines. You can even to limit to a particular extension, for example, limiting to image with `png, jpg, jpeg, webp`.
+
+> [!warning]
+> Linking to an image will always embed it.
 
 ### Creating not found links
 Depending on the previous settings, the creation of a not found "link" will:
@@ -30,12 +37,18 @@ Supports `up`, `down`, `enter`, and `escape` keys for navigating the link search
 
 ## Installing
 
-- [x] Using BRAT with https://github.com/mara-li/obsidian-custom-suggester → Or copy and open obsidian://brat?plugin=mara-li/obsidian-custom-suggester in your explorer or browser. It will automatically open Obsidian and install the plugin.
+- [x] Using BRAT with https://github.com/mara-li/obsidian-symbol-linking → Or copy and open obsidian://brat?plugin=mara-li/obsidian-symbol-linking in your explorer or browser. It will automatically open Obsidian and install the plugin.
 - [x] From the release page:
   - Download the latest release 
   - Unzip obsidian-custom-suggester.zip in .obsidian/plugins/ path 
   - In Obsidian settings, at "Community Plugin", reload the plugin list 
   - Enable the plugin (or reload it if already installed)
+
+## Limitation
+
+- The suggester doesn't show up in the properties when you use the mode "live-preview"
+- If used in properties in source mode, you must add the `"` around the link, like : `"[[file]]"`, otherwise it will be broken.
+- For image, it always link to an embed, even if you are in the properties part.
 
 ## Acknowledgements
 
