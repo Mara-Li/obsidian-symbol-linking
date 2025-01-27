@@ -2,6 +2,7 @@ import fuzzysort from "fuzzysort";
 import { type App, TFile, normalizePath } from "obsidian";
 import type { FileOption } from "src/types";
 import type { CustomSuggester } from "../settings/interface";
+import { isAllowedExtension } from "../utils/path";
 import { removeAccents } from "../utils/valid-file-name";
 
 export function sharedGetSuggestions(
@@ -24,7 +25,10 @@ export function sharedGetSuggestions(
 			for (const folder of settings.limitToDirectories) {
 				if (typedChar !== folder.triggerSymbol) continue;
 				newNoteDirectories.add(folder.path);
-				if (file.parent?.path.startsWith(folder.path)) {
+				if (
+					file.parent?.path.startsWith(folder.path) &&
+					isAllowedExtension(file, folder.extensions ?? [])
+				) {
 					isAllowed = true;
 					break;
 				}

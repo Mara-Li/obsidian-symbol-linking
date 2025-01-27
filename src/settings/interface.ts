@@ -1,6 +1,7 @@
 export interface CustomTriggerPerLimit {
 	triggerSymbol?: string;
 	path: string;
+	extensions?: string[];
 }
 
 export interface SymbolLinkingSettings {

@@ -29,6 +29,10 @@
 	overflow-wrap: break-word;
 }
 
+textarea.at-symbol-linking.max-width {
+	width: 90%;
+}
+
 .at-symbol-linking-suggestion .suggestion-aux {
 	display: flex;
 	align-items: center;

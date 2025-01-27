@@ -61,7 +61,7 @@ export default class SuggestionPopup extends EditorSuggest<
 				this.originalQuery,
 			);
 
-		const files = context.file.vault.getMarkdownFiles();
+		const files = this.app.vault.getFiles();
 		return sharedGetSuggestions(
 			files,
 			context.query,

@@ -221,7 +221,7 @@ export class LinkSuggest implements IOwner<Fuzzysort.KeysResult<FileOption>> {
 				this.originalQuery,
 			);
 		} else {
-			const files = this.app.vault.getMarkdownFiles();
+			const files = this.app.vault.getFiles();
 			return sharedGetSuggestions(
 				files,
 				query,

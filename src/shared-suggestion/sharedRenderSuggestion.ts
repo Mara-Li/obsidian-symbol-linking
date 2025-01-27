@@ -16,7 +16,7 @@ export default function sharedRenderSuggestion(
 	// Add title with matching search terms bolded (highlighted)
 	const title = el.doc.createElement("div");
 	title.addClass("suggestion-title");
-	if (value[0]) {
+	if (value[0]?.target) {
 		highlightSearch(title, value[0], value.obj, uniformize);
 	} else if (value.obj?.originalAlias) {
 		title.setText(value.obj?.originalAlias);
@@ -25,11 +25,10 @@ export default function sharedRenderSuggestion(
 	} else if (value[1]) {
 		highlightSearch(title, value[1], value.obj, uniformize);
 	} else if (value.obj?.fileName) {
-		title.setText(value.obj?.fileName);
+		title.setText(value.obj?.fileName.split(".")[0]);
 	} else {
 		title.setText("");
 	}
-
 	context.appendChild(title);
 	if (limitToOneFile === 0 || limitToOneFile > 1) {
 		const path = el.doc.createElement("div");
@@ -38,7 +37,7 @@ export default function sharedRenderSuggestion(
 		if (value.obj?.isCreateNewOption) {
 			pathText += `Create a new ${limitToOneFile > 1 ? "header" : "note"} in `;
 		}
-		pathText += value.obj?.filePath?.slice(0, -3);
+		pathText += value.obj?.filePath;
 		path.setText(pathText);
 		context.appendChild(path);
 	} else if (limitToOneFile === 1 && value.obj?.isCreateNewOption) {

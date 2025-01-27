@@ -279,6 +279,21 @@ export class SettingsTab extends PluginSettingTab {
 							})
 							.inputEl.addClass("min-width");
 					})
+					.addText((text) => {
+						text.setPlaceholder("Extensions");
+						text.setValue(directory.extensions?.join(", ") ?? "md");
+						text.onChange(async (value) => {
+							let res = value
+								.split(/[\n ,]+/)
+								.map((ext) => ext.trim().replace(/^\./, ""));
+							if (value.length === 0) res = ["md"];
+							this.plugin.settings.limitToDirectories[index].extensions = res;
+							await this.plugin.saveSettings();
+						});
+						text.inputEl.onblur = () => {
+							this.display();
+						};
+					})
 					.addExtraButton((cb) => {
 						cb.setIcon("up-chevron-glyph")
 							.setTooltip("Move up")
