@@ -1,3 +1,8 @@
+## [1.4.0](https://github.com/Mara-Li/obsidian-at-symbol-linking/compare/1.3.1...1.4.0) (2025-01-27)
+### Features
+
+* **exts:** allow to set more than just markdown for file-linking ([44530ca](https://github.com/Mara-Li/obsidian-at-symbol-linking/commit/44530ca31df7c5d5924e03dcbf021fc77e64697a))
+
 ## [1.3.1](https://github.com/Mara-Li/obsidian-at-symbol-linking/compare/1.3.0...1.3.1) (2025-01-18)
 ### Bug Fixes
 
