@@ -54,7 +54,7 @@ export async function sharedSelectSuggestion(
 				value.obj.alias = originalQuery;
 			} catch (error) {
 				new Notice(
-					`Unable to create new note at path: ${value.obj?.filePath}. Please open an issue on GitHub, https://github.com/Ebonsignori/obsidian-at-symbol-linking/issues`,
+					`Unable to create new note at path: ${value.obj?.filePath}. Please open an issue on GitHub, https://github.com/Mara-Li/symbol-linking/issues`,
 					0,
 				);
 				throw error;
