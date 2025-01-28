@@ -3,7 +3,7 @@
 	"name": "Symbol linking",
 	"version": "1.4.0",
 	"minAppVersion": "1.7.1",
-	"description": "Adds ability to link with any trigger in Obsidian. Each trigger can limit linking to specific folders or file.",
+	"description": "Adds ability to link with any trigger. Each trigger can limit linking to specific folders or file.",
 	"author": "Evan Bonsignori ; Mara-Li",
 	"authorUrl": "https://github.com/Mara-Li",
 	"isDesktopOnly": false,
