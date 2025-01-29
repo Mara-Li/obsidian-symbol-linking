@@ -122,14 +122,14 @@ export function sharedGetMonoFileSuggestion(
 	originalQuery: string,
 ): Fuzzysort.KeysResult<FileOption>[] {
 	if (settings.limitToFile.length === 0) return [];
-	const files: TFile[] = settings.limitToFile
+	const files = settings.limitToFile
 		.filter((x) => x.triggerSymbol == typedChar)
 		.map((path) => {
 			const file = app.vault.getAbstractFileByPath(path.path);
 			if (file && file instanceof TFile) return file;
 			return null;
 		})
-		.filter((file) => file !== null) as TFile[];
+		.filter((file) => file !== null);
 	if (files.length === 0) return [];
 	const options: FileOption[] = [];
 	for (const file of files) {

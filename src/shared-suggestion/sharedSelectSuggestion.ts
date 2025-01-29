@@ -1,4 +1,4 @@
-import { type App, Notice, type TFile } from "obsidian";
+import { type App, Notice, TFile } from "obsidian";
 import type { FileOption } from "src/types";
 import { fileNameNoExtension } from "src/utils/path";
 import { replaceNewFileVars } from "src/utils/replace-new-file-vars";
@@ -38,7 +38,13 @@ export async function sharedSelectSuggestion(
 			if (settings.addNewNoteTemplateFile) {
 				const fileTemplate = app.vault.getAbstractFileByPath(
 					`${settings.addNewNoteTemplateFile}.md`,
-				) as TFile;
+				);
+				if (!fileTemplate || !(fileTemplate instanceof TFile)) {
+					new Notice(
+						`Unable to get the file at path: ${settings.addNewNoteTemplateFile}. Verify the path in the settings.`,
+					);
+					throw new Error("Template file not found");
+				}
 				newNoteContents = (await app.vault.read(fileTemplate)) || "";
 				// Use core template settings to replace variables: {{title}}, {{date}}, {{time}}
 				newNoteContents = await replaceNewFileVars(
@@ -64,7 +70,14 @@ export async function sharedSelectSuggestion(
 
 	const currentFile = app.workspace.getActiveFile();
 	if (!linkFile) {
-		linkFile = app.vault.getAbstractFileByPath(value.obj?.filePath) as TFile;
+		linkFile = app.vault.getAbstractFileByPath(value.obj?.filePath);
+	}
+	if (!linkFile || !(linkFile instanceof TFile)) {
+		new Notice(
+			`Unable to get the file at path: ${value.obj?.filePath}. Please open an issue on GitHub, as this should not happen.`,
+			0,
+		);
+		throw new Error("File not found");
 	}
 	let alias = value.obj?.originalAlias || "";
 	const aliasFallBack =
