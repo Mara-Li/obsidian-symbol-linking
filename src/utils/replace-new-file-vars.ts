@@ -19,7 +19,7 @@ export async function replaceNewFileVars(
 ): Promise<string> {
 	if (!templateContent) return templateContent;
 
-	const coreTemplatesConfigPath = ".obsidian/templates.json";
+	const coreTemplatesConfigPath = `${app.vault.configDir}/templates.json`;
 	let coreTemplatesConfig;
 	try {
 		coreTemplatesConfig = await app.vault.adapter.read(coreTemplatesConfigPath);
