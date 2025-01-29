@@ -1,3 +1,8 @@
+## [1.4.1](https://github.com/Mara-Li/obsidian-at-symbol-linking/compare/1.4.0...1.4.1) (2025-01-29)
+### Bug Fixes
+
+* **replace-new-file-vars:** `.obsidian` is not necessary the configDir. ([5bbc62f](https://github.com/Mara-Li/obsidian-at-symbol-linking/commit/5bbc62fef4db41aa085df5d0fb5c3263832a133d))
+
 ## [1.4.0](https://github.com/Mara-Li/obsidian-at-symbol-linking/compare/1.3.1...1.4.0) (2025-01-27)
 ### Features
 
