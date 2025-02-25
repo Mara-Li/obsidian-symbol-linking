@@ -1,34 +1,31 @@
-import fuzzysort from "fuzzysort";
-import { type TAbstractFile, TFolder } from "obsidian";
-import { highlightSearch } from "src/utils/highlight-search";
-import { TextInputSuggest } from "src/utils/suggest";
+import {AbstractInputSuggest, type App, type TFolder} from "obsidian";
 
-export class FolderSuggest extends TextInputSuggest<Fuzzysort.KeyResult<TFolder>> {
-	getSuggestions(inputStr: string): Fuzzysort.KeyResult<TFolder>[] {
-		const abstractFiles = this.app.vault.getAllLoadedFiles();
-		const folders: TFolder[] = [];
-		const lowerCaseInputStr = inputStr.toLocaleLowerCase();
-
-		abstractFiles.forEach((folder: TAbstractFile) => {
-			if (
-				folder instanceof TFolder &&
-				folder.path.toLocaleLowerCase()?.contains(lowerCaseInputStr)
-			) {
-				folders.push(folder);
-			}
-		});
-
-		return fuzzysort.go(lowerCaseInputStr, folders, {
-			key: "path",
-		}) as any;
+export class FolderSuggester extends AbstractInputSuggest<string> {
+	constructor(
+		private inputEl: HTMLInputElement,
+		app: App,
+		private onSubmit: (value: string) => void
+	) {
+		super(app, inputEl);
 	}
 
-	renderSuggestion(file: Fuzzysort.KeyResult<TFolder>, el: HTMLElement): void {
-		highlightSearch(el, file);
+	renderSuggestion(value: string, el: HTMLElement): void {
+		el.setText(value);
 	}
 
-	selectSuggestion(file: Fuzzysort.KeyResult<TFolder>): void {
-		this.inputEl.value = file.obj?.path;
+	getSuggestions(query: string): string[] {
+		return this.app.vault
+			.getAllFolders()
+			.filter((folder: TFolder) => {
+				return folder.path.toLowerCase().startsWith(query.toLowerCase());
+			})
+			.map((folder: TFolder) => folder.path);
+	}
+
+	selectSuggestion(value: string, _evt: MouseEvent | KeyboardEvent): void {
+		this.inputEl.value = value;
+		this.onSubmit(value);
+		this.inputEl.focus();
 		this.inputEl.trigger("input");
 		this.close();
 	}

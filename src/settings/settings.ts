@@ -6,9 +6,8 @@ import {
 	Setting,
 } from "obsidian";
 import type AtSymbolLinking from "src/main";
-import { FileSuggest } from "./file-suggest";
 import { FileSuggestWithPath } from "./file-suggest-path";
-import { FolderSuggest } from "./folder-suggest";
+import { FolderSuggester } from "./folder-suggest";
 import { type CustomSuggester, DEFAULT_SETTINGS } from "./interface";
 
 const arrayMove = <T>(array: T[], fromIndex: number, toIndex: number): void => {
@@ -53,9 +52,9 @@ export class SettingsTab extends PluginSettingTab {
 						this.plugin.settings.triggerSymbol = value;
 						await this.plugin.saveSettings();
 					});
-				text.inputEl.onblur = () => {
+				text.inputEl.onblur = async () => {
 					this.display();
-					this.validate();
+					await this.validate();
 				};
 			});
 
@@ -116,15 +115,13 @@ export class SettingsTab extends PluginSettingTab {
 			const newFileSetting = new Setting(this.containerEl)
 				.setClass("at-symbol-linking-folder-container")
 				.addSearch((cb) => {
-					new FileSuggestWithPath(this.app, cb.inputEl);
-					cb.setPlaceholder("File")
-						.setValue(file.path)
-						.onChange(async (newFile) => {
-							this.plugin.settings.limitToFile[index].path = newFile.trim();
-							await this.plugin.saveSettings();
-						});
-					cb.inputEl.onblur = () => {
-						this.validate();
+					cb.setValue(file.path);
+					new FileSuggestWithPath(cb.inputEl, this.app, false, async (newFile) => {
+						this.plugin.settings.limitToFile[index].path = newFile.path;
+						await this.plugin.saveSettings();
+					});
+					cb.inputEl.onblur = async () => {
+						await this.validate();
 					};
 				})
 				.addText((text) => {
@@ -258,15 +255,13 @@ export class SettingsTab extends PluginSettingTab {
 				const newDirectorySetting = new Setting(this.containerEl)
 					.setClass("at-symbol-linking-folder-container")
 					.addSearch((cb) => {
-						new FolderSuggest(this.app, cb.inputEl);
-						cb.setPlaceholder("Folder")
-							.setValue(directory.path)
-							.onChange(async (newFolder) => {
-								this.plugin.settings.limitToDirectories[index].path = newFolder.trim();
-								await this.plugin.saveSettings();
-							});
-						cb.inputEl.onblur = () => {
-							this.validate();
+						cb.setPlaceholder("Folder").setValue(directory.path);
+						new FolderSuggester(cb.inputEl, this.app, async (result) => {
+							this.plugin.settings.limitToDirectories[index].path = result.trim();
+							await this.plugin.saveSettings();
+						});
+						cb.inputEl.onblur = async () => {
+							await this.validate();
 						};
 					})
 					.addText((text) => {
@@ -377,15 +372,18 @@ export class SettingsTab extends PluginSettingTab {
 					.setName("Add new note template")
 					.setDesc(newNoteTemplateDesc)
 					.addSearch((cb) => {
-						new FileSuggest(this.app, cb.inputEl);
-						cb.setPlaceholder("No template (blank note)")
-							.setValue(this.plugin.settings.addNewNoteTemplateFile)
-							.onChange(async (newFile) => {
-								this.plugin.settings.addNewNoteTemplateFile = newFile.trim();
-								await this.plugin.saveSettings();
-							});
-						cb.inputEl.onblur = () => {
-							this.validate();
+						cb.setPlaceholder("No template (blank note)").setValue(
+							this.plugin.settings.addNewNoteTemplateFile,
+						);
+						new FileSuggestWithPath(cb.inputEl, this.app, true, async (newFile) => {
+							this.plugin.settings.addNewNoteTemplateFile = newFile.path.replace(
+								/\.md$/,
+								"",
+							);
+							await this.plugin.saveSettings();
+						});
+						cb.inputEl.onblur = async () => {
+							await this.validate();
 						};
 					});
 				// End add new note template folder
@@ -397,15 +395,15 @@ export class SettingsTab extends PluginSettingTab {
 						`Folder to create new notes in when using ${this.plugin.settings.triggerSymbol} linking. If the limit directories is used, the folder will be the limited directory selected by the trigger.`,
 					)
 					.addSearch((cb) => {
-						new FolderSuggest(this.app, cb.inputEl);
-						cb.setPlaceholder("No folder (root)")
-							.setValue(this.plugin.settings.addNewNoteDirectory)
-							.onChange(async (newFolder) => {
-								this.plugin.settings.addNewNoteDirectory = newFolder.trim();
-								await this.plugin.saveSettings();
-							});
-						cb.inputEl.onblur = () => {
-							this.validate();
+						cb.setPlaceholder("No folder (root)").setValue(
+							this.plugin.settings.addNewNoteDirectory,
+						);
+						new FolderSuggester(cb.inputEl, this.app, async (result) => {
+							this.plugin.settings.addNewNoteDirectory = result.trim();
+							await this.plugin.saveSettings();
+						});
+						cb.inputEl.onblur = async () => {
+							await this.validate();
 						};
 					});
 				// End add new note directory
@@ -432,10 +430,10 @@ export class SettingsTab extends PluginSettingTab {
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.useCompatibilityMode)
-					.onChange((value: boolean) => {
+					.onChange(async (value: boolean) => {
 						this.shouldReset = true;
 						this.plugin.settings.useCompatibilityMode = value;
-						this.plugin.saveSettings();
+						await this.plugin.saveSettings();
 						this.plugin.registerPopup();
 						this.display();
 					}),
@@ -462,8 +460,8 @@ export class SettingsTab extends PluginSettingTab {
 						this.plugin.settings.leavePopupOpenForXSpaces = parseInt(value, 10);
 						await this.plugin.saveSettings();
 					});
-				text.inputEl.onblur = () => {
-					this.validate();
+				text.inputEl.onblur = async () => {
+					await this.validate();
 				};
 			});
 		// End leavePopupOpenForXSpaces option
@@ -490,8 +488,8 @@ export class SettingsTab extends PluginSettingTab {
 						this.plugin.settings.invalidCharacterRegex = value;
 						await this.plugin.saveSettings();
 					});
-				text.inputEl.onblur = () => {
-					this.validate("invalidCharacterRegex");
+				text.inputEl.onblur = async () => {
+					await this.validate("invalidCharacterRegex");
 				};
 			});
 		// End valid character regex option
@@ -513,8 +511,8 @@ export class SettingsTab extends PluginSettingTab {
 						this.plugin.settings.invalidCharacterRegexFlags = value;
 						await this.plugin.saveSettings();
 					});
-				text.inputEl.onblur = () => {
-					this.validate("invalidCharacterRegexFlags");
+				text.inputEl.onblur = async () => {
+					await this.validate("invalidCharacterRegexFlags");
 				};
 			});
 		// End valid character regex flags option
@@ -524,10 +522,12 @@ export class SettingsTab extends PluginSettingTab {
 			.setName("Remove accents from search query")
 			.setDesc("e.g. é -> e when searching or creating links via the popup.")
 			.addToggle((toggle) =>
-				toggle.setValue(this.plugin.settings.removeAccents).onChange((value: boolean) => {
-					this.plugin.settings.removeAccents = value;
-					this.plugin.saveSettings();
-				}),
+				toggle
+					.setValue(this.plugin.settings.removeAccents)
+					.onChange(async (value: boolean) => {
+						this.plugin.settings.removeAccents = value;
+						await this.plugin.saveSettings();
+					}),
 			);
 	}
 

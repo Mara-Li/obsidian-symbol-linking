@@ -1,34 +1,34 @@
-import fuzzysort from "fuzzysort";
-import type { TFile } from "obsidian";
-import { highlightSearch } from "../utils/highlight-search";
-import { TextInputSuggest } from "../utils/suggest";
+import { AbstractInputSuggest, type App, type TFile } from "obsidian";
 
-export class FileSuggestWithPath extends TextInputSuggest<Fuzzysort.KeyResult<TFile>> {
-	getSuggestions(inputStr: string): Fuzzysort.KeyResult<TFile>[] {
-		let abstractFiles = this.app.vault.getAllLoadedFiles();
-		const lowerCaseInputStr = inputStr.toLocaleLowerCase();
-
-		abstractFiles = abstractFiles.filter((file) => {
-			return file.path.endsWith(".md");
-		});
-		abstractFiles = abstractFiles.map((file) => {
-			return {
-				...file,
-				path: file.path,
-			};
-		});
-
-		return fuzzysort.go(lowerCaseInputStr, abstractFiles, {
-			key: "path",
-		}) as any;
+export class FileSuggestWithPath extends AbstractInputSuggest<TFile> {
+	removeExt: boolean = false;
+	constructor(
+		private inputEl: HTMLInputElement,
+		app: App,
+		removeExt: boolean = false,
+		private onSubmit: (value: TFile) => void,
+	) {
+		super(app, inputEl);
+		this.removeExt = removeExt;
+	}
+	renderSuggestion(value: TFile, el: HTMLElement) {
+		el.setText(this.removeExt ? value.path.replace(/\.md$/, "") : value.path);
 	}
 
-	renderSuggestion(file: Fuzzysort.KeyResult<TFile>, el: HTMLElement): void {
-		highlightSearch(el, file);
+	getItems(): TFile[] {
+		return this.app.vault.getMarkdownFiles();
 	}
 
-	selectSuggestion(file: Fuzzysort.KeyResult<TFile>): void {
-		this.inputEl.value = file.obj?.path;
+	protected getSuggestions(query: string): TFile[] {
+		return this.getItems().filter((file) =>
+			file.path.toLowerCase().startsWith(query.toLowerCase()),
+		);
+	}
+
+	selectSuggestion(value: TFile, _evt: MouseEvent | KeyboardEvent) {
+		this.onSubmit(value);
+		this.inputEl.value = this.removeExt ? value.path.replace(/\.md$/, "") : value.path;
+		this.inputEl.focus();
 		this.inputEl.trigger("input");
 		this.close();
 	}
