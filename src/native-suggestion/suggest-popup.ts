@@ -28,7 +28,7 @@ export default class SuggestionPopup extends EditorSuggest<
 	private firstOpenedCursor: null | EditorPosition = null;
 	private focused = false;
 	private readonly app: App;
-	public name = "@ Symbol Linking Suggest";
+	public name = "Symbol linking suggest";
 
 	constructor(app: App, settings: CustomSuggester) {
 		super(app);

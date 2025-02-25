@@ -42,7 +42,7 @@ export class SettingsTab extends PluginSettingTab {
 		const triggerSymbolDesc = document.createDocumentFragment();
 		triggerSymbolDesc.append("Type this symbol to trigger the popup.");
 		new Setting(this.containerEl)
-			.setName("Default trigger Symbol")
+			.setName("Default symbol (trigger)")
 			.setDesc(triggerSymbolDesc)
 			.addText((text) => {
 				text
