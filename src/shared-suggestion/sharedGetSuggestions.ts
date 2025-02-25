@@ -27,7 +27,7 @@ export function sharedGetSuggestions(
 				newNoteDirectories.add(folder.path);
 				if (
 					file.parent?.path.startsWith(folder.path) &&
-					isAllowedExtension(file, folder.extensions ?? [])
+					isAllowedExtension(file, folder.extensions ?? ["md"])
 				) {
 					isAllowed = true;
 					break;

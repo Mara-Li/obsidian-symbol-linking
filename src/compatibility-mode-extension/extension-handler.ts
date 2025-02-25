@@ -113,6 +113,14 @@ export function atSymbolTriggerExtension(app: App, settings: CustomSuggester) {
 
 				// Build query when open
 				const key = event.key.toLocaleLowerCase();
+				const excludeFrom = [
+					"backspace",
+					"shift",
+					"arrow",
+					"tab",
+					"capslock",
+					"alt",
+				].find((excluded) => key.includes(excluded));
 				if (typedChar === "Backspace") {
 					if (this.openQuery.length === 0) {
 						return this.closeSuggestion();
@@ -125,9 +133,7 @@ export function atSymbolTriggerExtension(app: App, settings: CustomSuggester) {
 					event.altKey ||
 					event.metaKey ||
 					event.ctrlKey ||
-					key.includes("backspace") ||
-					key.includes("shift") ||
-					key.includes("arrow")
+					excludeFrom
 				) {
 					return false;
 				} else if (!justOpened) {
@@ -220,7 +226,7 @@ export function atSymbolTriggerExtension(app: App, settings: CustomSuggester) {
 						}),
 					);
 				} catch (error) {
-					console.log("@ Symbol Linking: Error creating first link", error);
+					console.log("Symbol Linking: Error creating first link", error);
 					this.view.dispatch(
 						this.view.state.update({
 							changes: {

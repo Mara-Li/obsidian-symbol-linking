@@ -244,6 +244,7 @@ export class SettingsTab extends PluginSettingTab {
 							this.plugin.settings.limitToDirectories.push({
 								path: "",
 								triggerSymbol: this.plugin.settings.triggerSymbol,
+								extensions: ["md"],
 							});
 							this.plugin.settings._enableOneFile = false;
 							await this.plugin.saveSettings();

@@ -15,6 +15,7 @@ export default class AtSymbolLinking extends Plugin {
 	_suggestionPopup: SuggestionPopup;
 
 	async onload() {
+		console.log(`[${this.manifest.id}] Loading plugin`);
 		await this.loadSettings();
 
 		this.addSettingTab(new SettingsTab(this.app, this));
@@ -23,7 +24,7 @@ export default class AtSymbolLinking extends Plugin {
 	}
 
 	onunload() {
-		console.log("unloading plugin");
+		console.log(`[${this.manifest.id}] Unloading plugin`);
 	}
 
 	// If compatibility mode is enabled, use the HTML extension-based popup
