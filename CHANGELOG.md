@@ -1,3 +1,5 @@
+## [1.4.2](https://github.com/Mara-Li/obsidian-symbol-linking/compare/1.4.1...1.4.2) (2025-02-25)
+
 ## [1.4.1](https://github.com/Mara-Li/obsidian-at-symbol-linking/compare/1.4.0...1.4.1) (2025-01-29)
 ### Bug Fixes
 
