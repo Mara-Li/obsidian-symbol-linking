@@ -466,7 +466,7 @@ export class SettingsTab extends PluginSettingTab {
 			});
 		// End leavePopupOpenForXSpaces option
 
-		new Setting(this.containerEl).setName("Advanced settings").setHeading();
+		new Setting(this.containerEl).setName("Advanced").setHeading();
 
 		// Begin invalid character regex option
 		const invalidCharacterRegexDesc = document.createDocumentFragment();
