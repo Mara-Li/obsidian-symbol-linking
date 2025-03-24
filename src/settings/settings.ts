@@ -559,7 +559,7 @@ export class SettingsTab extends PluginSettingTab {
 			const folderFile = this.app.vault.getAbstractFileByPath(folder.path);
 			if (!folderFile) {
 				new Notice(
-					`Unable to find folder at path: ${folder}. Please add it if you want to limit links to this folder.`,
+					`Unable to find folder at path: ${folder.path}. Please add it if you want to limit links to this folder.`,
 				);
 				const newFolders = [...settings.limitToDirectories];
 				newFolders[i].path = "";
