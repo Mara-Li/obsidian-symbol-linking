@@ -1,7 +1,7 @@
 {
 	"id": "symbol-linking",
 	"name": "Symbol linking",
-	"version": "1.4.2",
+	"version": "1.4.3",
 	"minAppVersion": "1.7.1",
 	"description": "Adds ability to link with any trigger. Each trigger can limit linking to specific folders or file.",
 	"author": "Evan Bonsignori ; Mara-Li",

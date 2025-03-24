@@ -1,3 +1,9 @@
+## [1.4.3](https://github.com/Mara-Li/obsidian-symbol-linking/compare/1.4.2...1.4.3) (2025-03-24)
+### Bug Fixes
+
+* better fuzzy search with includes instead of "startswith" ([3916aae](https://github.com/Mara-Li/obsidian-symbol-linking/commit/3916aae6b43b8b03e81d0ff86c50a72aba45d2f7))
+* error that show [Object Object] instead of folder path. ([84bed0e](https://github.com/Mara-Li/obsidian-symbol-linking/commit/84bed0ea41e3c4b089416e39728b6133ff0e8e71))
+
 ## [1.4.2](https://github.com/Mara-Li/obsidian-symbol-linking/compare/1.4.1...1.4.2) (2025-02-25)
 
 ## [1.4.1](https://github.com/Mara-Li/obsidian-at-symbol-linking/compare/1.4.0...1.4.1) (2025-01-29)
