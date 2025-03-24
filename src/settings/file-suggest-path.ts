@@ -21,7 +21,7 @@ export class FileSuggestWithPath extends AbstractInputSuggest<TFile> {
 
 	protected getSuggestions(query: string): TFile[] {
 		return this.getItems().filter((file) =>
-			file.path.toLowerCase().startsWith(query.toLowerCase()),
+			file.path.toLowerCase().contains(query.toLowerCase()),
 		);
 	}
 

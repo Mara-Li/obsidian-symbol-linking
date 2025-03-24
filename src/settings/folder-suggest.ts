@@ -1,10 +1,10 @@
-import {AbstractInputSuggest, type App, type TFolder} from "obsidian";
+import { AbstractInputSuggest, type App, type TFolder } from "obsidian";
 
 export class FolderSuggester extends AbstractInputSuggest<string> {
 	constructor(
 		private inputEl: HTMLInputElement,
 		app: App,
-		private onSubmit: (value: string) => void
+		private onSubmit: (value: string) => void,
 	) {
 		super(app, inputEl);
 	}
@@ -17,7 +17,7 @@ export class FolderSuggester extends AbstractInputSuggest<string> {
 		return this.app.vault
 			.getAllFolders()
 			.filter((folder: TFolder) => {
-				return folder.path.toLowerCase().startsWith(query.toLowerCase());
+				return folder.path.toLowerCase().contains(query.toLowerCase());
 			})
 			.map((folder: TFolder) => folder.path);
 	}
