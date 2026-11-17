@@ -1,40 +1,43 @@
-name: Release obsidian plugin
+name : Release obsidian plugin
 
-on:
-  workflow_dispatch:
-    inputs:
-      bump:
-        default: false
-        description: "Bump version based on semantic release"
-        type: boolean
-        required: false
-      beta:
-        default: false
-        description: "Make a beta release"
-        type: boolean
-        required: false
-  push:
-    tags:
-      - "*"
-permissions:
-  contents: write
+on :
+    workflow_dispatch :
+        inputs :
+            bump :
+                default : false
+                description : "Bump version based on semantic release"
+                type : boolean
+                required : false
+            beta :
+                default : false
+                description : "Make a beta release"
+                type : boolean
+                required : false
+    push :
+        tags :
+            - "*"
+permissions :
+    contents : write
+    id-token : write
+    attestations : write
 
-jobs:
-  release:
-    if: (github.event_name == 'push') || (github.event_name == 'workflow_dispatch' && !inputs.bump)
-    uses: mara-li/reusable-workflows/.github/workflows/obsidian-plugin-release.yaml@main
-    with:
-      PLUGIN_NAME: symbol-linking
-      CACHE: "bun"
-    secrets:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  bump-version-and-release:
-    if: ${{ inputs.bump }}
-    uses: mara-li/reusable-workflows/.github/workflows/obsidian-plugin-bump-version.yaml@main
-    with:
-      PLUGIN_NAME: symbol-linking
-      BETA: ${{ inputs.beta }}
-      CACHE: "bun"
-    secrets:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+jobs :
+    release :
+        if : (github.event_name == 'push') || (github.event_name == 'workflow_dispatch' && !inputs.bump)
+        uses : mara-li/reusable-workflows/.github/workflows/obsidian-plugin-release.yaml@main
+        
+        with :
+            PLUGIN_NAME : "symbol-linking"
+            CACHE : "pnpm"
+        secrets :
+            GH_TOKEN : ${{ secrets.GITHUB_TOKEN }}
+    
+    bump-version-and-release :
+        if : ${{ inputs.bump || false }}
+        uses : mara-li/reusable-workflows/.github/workflows/obsidian-plugin-bump-version.yaml@main
+        with :
+            PLUGIN_NAME : "symbol-linking"
+            BETA : ${{ inputs.beta || false}}
+            CACHE : "pnpm"
+        secrets :
+            GH_TOKEN : ${{ secrets.GITHUB_TOKEN }}
