@@ -44,7 +44,8 @@ export const DEFAULT: SymbolLinkingSettings = {
 	addNewNoteDirectory: "",
 	useCompatibilityMode: false,
 	leavePopupOpenForXSpaces: 0,
-	invalidCharacterRegex: `[\[\]^|#]`,
+	// String.raw keeps the backslashes: a plain template literal turned this into `[[]^|#]`
+	invalidCharacterRegex: String.raw`[\[\]^|#]`,
 	invalidCharacterRegexFlags: "i",
 	removeAccents: true,
 };

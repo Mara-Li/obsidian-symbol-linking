@@ -1,12 +1,4 @@
 /* At Symbol Linking styles */
-.at-symbol-linking-folder-container {
-	border: none;
-}
-
-.at-symbol-linking-folder-setting .search-input-container {
-	width: 100%;
-}
-
 .at-symbol-linking-suggestion {
 	align-items: baseline;
 	display: flex;
@@ -27,10 +19,6 @@
 	width: 100%;
 	flex-basis: 100%;
 	overflow-wrap: break-word;
-}
-
-textarea.at-symbol-linking.max-width {
-	width: 90%;
 }
 
 .at-symbol-linking-suggestion .suggestion-aux {
@@ -54,6 +42,26 @@ textarea.at-symbol-linking.max-width {
 	max-width: 500px;
 }
 
-.at-symbol-linking input.min-width {
-	width: 10ch;
+/* Compatibility mode: zero-size anchor placed under the cursor, and the popup next to it */
+.at-symbol-linking-anchor {
+	position: absolute;
+	z-index: 1000;
+	width: 0;
+	height: 0;
+}
+
+.at-symbol-linking-anchor.is-mobile {
+	bottom: var(--mobile-toolbar-height);
+	left: 0;
+}
+
+.at-symbol-linking-compat-popup {
+	position: fixed;
+	z-index: 1000;
+}
+
+.at-symbol-linking-compat-popup.is-mobile {
+	left: 0;
+	width: 100vw;
+	padding: 0;
 }

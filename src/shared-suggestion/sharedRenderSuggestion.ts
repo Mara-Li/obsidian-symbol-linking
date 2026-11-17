@@ -1,63 +1,50 @@
 import { setIcon } from "obsidian";
-import type { FileOption } from "src/types";
-import { highlightSearch } from "src/utils/highlight-search";
+import type { FileSuggestion } from "../types";
+import { highlightSearch } from "../utils/highlight-search";
 
 export default function sharedRenderSuggestion(
-	value: Fuzzysort.KeysResult<FileOption>,
+	value: FileSuggestion,
 	el: HTMLElement,
 	limitToOneFile: number = 0,
 	uniformize?: boolean,
 ): void {
 	el.addClass("at-symbol-linking-suggestion");
-	const context = el.doc.createElement("div");
-	context.addClass("suggestion-context");
+	const context = el.createDiv({ cls: "suggestion-context" });
 	context.id = "at-symbol-suggestion-context";
 
 	// Add title with matching search terms bolded (highlighted)
-	const title = el.doc.createElement("div");
-	title.addClass("suggestion-title");
-	if (value[0]?.target) {
-		highlightSearch(title, value[0], value.obj, uniformize);
-	} else if (value.obj?.originalAlias) {
-		title.setText(value.obj?.originalAlias);
-	} else if (value.obj?.alias) {
-		title.setText(value.obj?.alias);
-	} else if (value[1]) {
-		highlightSearch(title, value[1], value.obj, uniformize);
-	} else if (value.obj?.fileName) {
-		title.setText(value.obj?.fileName.split(".")[0]);
+	const title = context.createDiv({ cls: "suggestion-title" });
+	const firstMatch = value[0];
+	const secondMatch = value[1];
+	if (firstMatch?.target) {
+		highlightSearch(title, firstMatch, value.obj, uniformize);
+	} else if (value.obj.originalAlias) {
+		title.setText(value.obj.originalAlias);
+	} else if (value.obj.alias) {
+		title.setText(value.obj.alias);
+	} else if (secondMatch) {
+		highlightSearch(title, secondMatch, value.obj, uniformize);
 	} else {
-		title.setText("");
+		title.setText(value.obj.fileName.split(".")[0] ?? "");
 	}
-	context.appendChild(title);
+
 	if (limitToOneFile === 0 || limitToOneFile > 1) {
-		const path = el.doc.createElement("div");
-		path.addClass("suggestion-path");
 		let pathText = "";
-		if (value.obj?.isCreateNewOption) {
+		if (value.obj.isCreateNewOption) {
 			pathText += `Create a new ${limitToOneFile > 1 ? "header" : "note"} in `;
 		}
-		pathText += value.obj?.filePath;
-		path.setText(pathText);
-		context.appendChild(path);
-	} else if (limitToOneFile === 1 && value.obj?.isCreateNewOption) {
-		const path = el.doc.createElement("div");
-		path.addClass("suggestion-path");
-		path.setText("Create a new header");
-		context.appendChild(path);
+		pathText += value.obj.filePath;
+		context.createDiv({ cls: "suggestion-path", text: pathText });
+	} else if (limitToOneFile === 1 && value.obj.isCreateNewOption) {
+		context.createDiv({ cls: "suggestion-path", text: "Create a new header" });
 	}
 
-	const aux = el.doc.createElement("div");
-	aux.addClass("suggestion-aux");
-
-	if (value?.obj?.alias) {
-		const alias = el.doc.createElement("span");
-		alias.addClass("suggestion-flair");
-		alias.ariaLabel = "Alias";
+	const aux = el.createDiv({ cls: "suggestion-aux" });
+	if (value.obj.alias) {
+		const alias = aux.createSpan({
+			cls: "suggestion-flair",
+			attr: { "aria-label": "Alias" },
+		});
 		setIcon(alias, "forward");
-		aux.appendChild(alias);
 	}
-
-	el.appendChild(context);
-	el.appendChild(aux);
 }

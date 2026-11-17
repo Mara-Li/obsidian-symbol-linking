@@ -6,12 +6,12 @@
  */
 
 import { syntaxTree } from "@codemirror/language";
+import type { EditorView, PluginValue } from "@codemirror/view";
 import { ViewPlugin } from "@codemirror/view";
-import type { EditorView, PluginValue, Rect } from "@codemirror/view";
 import { type App, type EditorPosition, Platform } from "obsidian";
-import { isValidFileNameCharacter } from "src/utils/valid-file-name";
 import type { CustomSuggester } from "../settings/interface";
-import { LinkSuggest } from "./extension-popup";
+import { isValidFileNameCharacter } from "../utils/valid-file-name";
+import { LINE_HEIGHT, LinkSuggest } from "./extension-popup";
 
 // Max parents we will iterate through to determine if a click event is outside the suggestion popup
 const maxParentDepth = 5;
@@ -25,18 +25,25 @@ export function atSymbolTriggerExtension(app: App, settings: CustomSuggester) {
 			private isOpen = false;
 			private suggestionEl: HTMLDivElement | null = null;
 			private suggestionPopup: LinkSuggest | null = null;
+			// Listeners bound to this instance, kept to remove them in destroy()
+			private readonly keyListener: (event: KeyboardEvent) => void;
+			private readonly clickListener: (event: MouseEvent) => void;
 
 			constructor(view: EditorView) {
 				this.view = view;
-				this.handleKeyEvent = this.handleKeyEvent.bind(this);
-				this.handleClickEvent = this.handleClickEvent.bind(this);
-				window.addEventListener("click", this.handleClickEvent);
-				this.view.dom.addEventListener("keydown", this.handleKeyEvent);
+				this.keyListener = (event) => {
+					this.handleKeyEvent(event);
+				};
+				this.clickListener = (event) => {
+					this.handleClickEvent(event);
+				};
+				window.addEventListener("click", this.clickListener);
+				this.view.dom.addEventListener("keydown", this.keyListener);
 			}
 
 			public destroy(): void {
-				this.view.dom.removeEventListener("keydown", this.handleKeyEvent);
-				window.removeEventListener("click", this.handleClickEvent);
+				this.view.dom.removeEventListener("keydown", this.keyListener);
+				window.removeEventListener("click", this.clickListener);
 			}
 
 			public closeSuggestion(): boolean {
@@ -58,13 +65,11 @@ export function atSymbolTriggerExtension(app: App, settings: CustomSuggester) {
 
 			private handleKeyEvent(event: KeyboardEvent): boolean {
 				// Don't enable when editing title
-				let isInTitle = false;
-				(<DOMTokenList>(<HTMLElement>event.target)?.classList || []).forEach(
-					(className: string) => {
-						isInTitle = isInTitle || className === "inline-title";
-					},
-				);
-				if (isInTitle) {
+				const target = event.target as Node | null;
+				if (
+					target?.instanceOf(HTMLElement) &&
+					target.classList.contains("inline-title")
+				) {
 					return false;
 				}
 
@@ -76,11 +81,8 @@ export function atSymbolTriggerExtension(app: App, settings: CustomSuggester) {
 				}
 
 				let isInValidContext = true;
-				const cursor = (<any>this.view)?.viewState.state?.selection?.main as {
-					from: number;
-					to: number;
-				};
-				syntaxTree((<any>this.view)?.viewState?.state).iterate({
+				const cursor = this.view.state.selection.main;
+				syntaxTree(this.view.state).iterate({
 					from: cursor.from,
 					to: cursor.to,
 					enter(node) {
@@ -158,29 +160,21 @@ export function atSymbolTriggerExtension(app: App, settings: CustomSuggester) {
 				//if (settings.removeAccents) this.openQuery = removeAccents(this.openQuery);
 
 				if (!this.suggestionEl && this.firstOpenedCursor && this.view) {
-					const container = (<any>app).dom.appContainerEl as HTMLElement;
-					this.suggestionEl = createDiv();
-					this.suggestionEl.style.position = "absolute";
-					this.suggestionEl.style.zIndex = "1000";
+					const container = app.dom.appContainerEl;
+					// Zero-size anchor the popup is positioned against
+					this.suggestionEl = createDiv({ cls: "at-symbol-linking-anchor" });
 					this.suggestionEl.id = "at-symbol-suggestion-root";
-					this.suggestionEl.style.width = "0px";
-					this.suggestionEl.style.height = "0px";
 
 					if (Platform.isDesktop) {
-						const { left: leftOffset, top: topOffset } = this.view.coordsAtPos(
-							(<EditorPosition>this.firstOpenedCursor)?.ch,
-						) as Rect;
-
-						this.suggestionEl.style.left = `${leftOffset}px`;
-						// const currentLineElement =
-						// 	container.getElementsByClassName("cm-active cm-line")?.[0];
-						// const lineElementHeight =
-						// 	currentLineElement?.getBoundingClientRect()?.height || 24;
-						const lineElementHeight = 24;
-						this.suggestionEl.style.top = `${topOffset + lineElementHeight}px`;
+						const coords = this.view.coordsAtPos(this.firstOpenedCursor.ch);
+						if (coords) {
+							this.suggestionEl.setCssStyles({
+								left: `${coords.left}px`,
+								top: `${coords.top + LINE_HEIGHT}px`,
+							});
+						}
 					} else {
-						this.suggestionEl.style.bottom = "var(--mobile-toolbar-height)";
-						this.suggestionEl.style.left = "0px";
+						this.suggestionEl.addClass("is-mobile");
 					}
 					container.appendChild(this.suggestionEl);
 					this.suggestionPopup = new LinkSuggest(
@@ -188,7 +182,7 @@ export function atSymbolTriggerExtension(app: App, settings: CustomSuggester) {
 						this.suggestionEl,
 						settings,
 						typedChar,
-						this.onSelect.bind(this),
+						(linkText) => this.onSelect(linkText),
 					);
 					this.suggestionPopup.onInputChanged(this.openQuery);
 				}
@@ -200,19 +194,22 @@ export function atSymbolTriggerExtension(app: App, settings: CustomSuggester) {
 				return true;
 			}
 
-			handleClickEvent(event: any) {
+			private handleClickEvent(event: MouseEvent): void {
 				if (this.isOpen) {
 					// Determine if click is outside the suggestion popup
 					let currentDepth = 0;
-					let parent = event.target;
+					let parent = event.target as Node | null;
 					let shouldClose = true;
 					while (event.target && currentDepth < maxParentDepth) {
 						currentDepth++;
-						if (parent?.id === "at-symbol-suggestion-context") {
+						if (
+							parent?.instanceOf(HTMLElement) &&
+							parent.id === "at-symbol-suggestion-context"
+						) {
 							shouldClose = false;
 							break;
 						}
-						parent = parent?.parentNode;
+						parent = parent?.parentNode ?? null;
 					}
 					if (shouldClose) {
 						this.closeSuggestion();
@@ -222,22 +219,23 @@ export function atSymbolTriggerExtension(app: App, settings: CustomSuggester) {
 
 			private onSelect(linkText: string) {
 				const cursor = this.getCursor();
+				const from = this.firstOpenedCursor?.ch ?? cursor.ch;
 				try {
 					this.view.dispatch(
 						this.view.state.update({
 							changes: {
-								from: this.firstOpenedCursor?.ch as number,
+								from,
 								to: cursor.ch,
 								insert: linkText,
 							},
 						}),
 					);
 				} catch (error) {
-					console.log("Symbol Linking: Error creating first link", error);
+					console.error("Symbol Linking: Error creating first link", error);
 					this.view.dispatch(
 						this.view.state.update({
 							changes: {
-								from: this.firstOpenedCursor?.ch as number,
+								from,
 								insert: linkText,
 							},
 						}),
@@ -248,7 +246,7 @@ export function atSymbolTriggerExtension(app: App, settings: CustomSuggester) {
 			}
 
 			private getCursor(): EditorPosition {
-				const ch = this.view.state.selection.ranges[0].head;
+				const ch = this.view.state.selection.main.head;
 				const line = this.view.state.doc.lineAt(ch).number;
 				return {
 					ch,

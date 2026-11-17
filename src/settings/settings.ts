@@ -1,23 +1,22 @@
 import {
 	type App,
-	type ButtonComponent,
-	Notice,
 	PluginSettingTab,
-	Setting,
+	type SettingDefinition,
+	type SettingDefinitionItem,
+	type SettingDefinitionList,
+	TFile,
+	TFolder,
 } from "obsidian";
-import type AtSymbolLinking from "src/main";
-import { FileSuggestWithPath } from "./file-suggest-path";
-import { FolderSuggester } from "./folder-suggest";
-import { type CustomSuggester, DEFAULT_SETTINGS } from "./interface";
+import type AtSymbolLinking from "../main";
+import {
+	type CustomSuggester,
+	type CustomTriggerPerLimit,
+	DEFAULT_SETTINGS,
+} from "./interface";
+import { LimitEntryModal, type LimitKind } from "./limit-modal";
 
-const arrayMove = <T>(array: T[], fromIndex: number, toIndex: number): void => {
-	if (toIndex < 0 || toIndex === array.length) {
-		return;
-	}
-	const temp = array[fromIndex];
-	array[fromIndex] = array[toIndex];
-	array[toIndex] = temp;
-};
+/** Settings stored without the `.md` extension, but edited through a `file` control. */
+const TEMPLATE_KEY = "addNewNoteTemplateFile";
 
 export class SettingsTab extends PluginSettingTab {
 	plugin: AtSymbolLinking;
@@ -29,600 +28,300 @@ export class SettingsTab extends PluginSettingTab {
 		this.shouldReset = false;
 	}
 
-	// On close, reload the plugin
+	// On close, reload the plugin if the popup mode changed
 	hide() {
-		this.plugin.reloadPlugin(this.shouldReset);
+		super.hide();
+		void this.plugin.reloadPlugin(this.shouldReset);
 		this.shouldReset = false;
 	}
 
-	display(): void {
-		this.containerEl.empty();
-		this.containerEl.addClass("at-symbol-linking");
-		// Begin triggerSymbol option: Determine which symbol triggers the popup
-		const triggerSymbolDesc = document.createDocumentFragment();
-		triggerSymbolDesc.append("Type this symbol to trigger the popup.");
-		new Setting(this.containerEl)
-			.setName("Default symbol (trigger)")
-			.setDesc(triggerSymbolDesc)
-			.addText((text) => {
-				text
-					.setPlaceholder("@")
-					.setValue(this.plugin.settings.triggerSymbol)
-					.onChange(async (value: string) => {
-						this.plugin.settings.triggerSymbol = value;
-						await this.plugin.saveSettings();
-					});
-				text.inputEl.onblur = async () => {
-					this.display();
-					await this.validate();
-				};
-			});
-
-		// Begin includeSymbol option: Determine whether to include @ symbol in link
-		const includeSymbolDesc = document.createDocumentFragment();
-		includeSymbolDesc.append(
-			`Include the trigger symbol (default: ${this.plugin.settings.triggerSymbol}) prefixing the final link text`,
-			includeSymbolDesc.createEl("br"),
-			includeSymbolDesc.createEl("em", {
-				text: `E.g. [${
-					this.plugin.settings.includeSymbol ? this.plugin.settings.triggerSymbol : ""
-				}evan](./evan)`,
-			}),
-		);
-		new Setting(this.containerEl)
-			.setName(`Include the trigger symbol`)
-			.setDesc(includeSymbolDesc)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.includeSymbol)
-					.onChange(async (value: boolean) => {
-						this.plugin.settings.includeSymbol = value;
-						await this.plugin.saveSettings();
-						this.display();
-					}),
-			);
-		// End includeSymbol option
-		// Start limitToOneFile option
-		const messageAboutLevel =
-			this.plugin.settings.headerLevelForContact === 0
-				? "include all headers"
-				: `current heading level: ${this.plugin.settings.headerLevelForContact}`;
-		if (this.plugin.settings.limitToDirectories.length === 0) {
-			new Setting(this.containerEl)
-				.setName("Limit links to files")
-				.setHeading()
-				.setDesc(
-					`Limit to one files for contact linking, using the header (${messageAboutLevel}) as the contact name.
-				Leave empty to use the directories structure instead.`,
-				)
-				.addButton((button: ButtonComponent) => {
-					button
-						.setTooltip("Add a file")
-						.setButtonText("+")
-						.setCta()
-						.onClick(async () => {
-							this.plugin.settings.limitToFile.push({
-								path: "",
-								triggerSymbol: this.plugin.settings.triggerSymbol,
-							});
-							this.plugin.settings._enableOneFile = true;
-							await this.plugin.saveSettings();
-							return this.display();
-						});
-				});
+	getControlValue(key: string): unknown {
+		if (key === TEMPLATE_KEY) {
+			const template = this.plugin.settings.addNewNoteTemplateFile;
+			return template ? `${template}.md` : "";
 		}
-		this.plugin.settings.limitToFile.forEach((file, index) => {
-			const newFileSetting = new Setting(this.containerEl)
-				.setClass("at-symbol-linking-folder-container")
-				.addSearch((cb) => {
-					cb.setValue(file.path);
-					new FileSuggestWithPath(cb.inputEl, this.app, false, async (newFile) => {
-						this.plugin.settings.limitToFile[index].path = newFile.path;
-						await this.plugin.saveSettings();
-					});
-					cb.inputEl.onblur = async () => {
-						await this.validate();
-					};
-				})
-				.addText((text) => {
-					text
-						.setPlaceholder("Trigger symbol")
-						.setValue(file.triggerSymbol ?? this.plugin.settings.triggerSymbol)
-						.onChange(async (value) => {
-							this.plugin.settings.limitToFile[index].triggerSymbol = value;
-							await this.plugin.saveSettings();
-						})
-						.inputEl.addClass("min-width");
-				})
-				.addExtraButton((cb) => {
-					cb.setIcon("up-chevron-glyph")
-						.setTooltip("Move up")
-						.onClick(async () => {
-							arrayMove(this.plugin.settings.limitToFile, index, index - 1);
-							await this.plugin.saveSettings();
-							this.display();
-						});
-				})
-				.addExtraButton((cb) => {
-					cb.setIcon("down-chevron-glyph")
-						.setTooltip("Move down")
-						.onClick(async () => {
-							arrayMove(this.plugin.settings.limitToFile, index, index + 1);
-							await this.plugin.saveSettings();
-							this.display();
-						});
-				})
-				.addExtraButton((cb) => {
-					cb.setIcon("cross")
-						.setTooltip("Delete")
-						.onClick(async () => {
-							this.plugin.settings.limitToFile.splice(index, 1);
-							await this.plugin.saveSettings();
-							this.display();
-						});
-				});
-			newFileSetting.controlEl.addClass("at-symbol-linking-folder-setting");
-			newFileSetting.infoEl.remove();
-		});
-
-		if (
-			this.plugin.settings.limitToFile.length === 0 &&
-			this.plugin.settings.limitToDirectories.length === 0
-		)
-			this.plugin.settings._enableOneFile = false;
-
-		if (this.plugin.settings._enableOneFile) {
-			const snRdTh =
-				this.plugin.settings.headerLevelForContact === 2
-					? "nd"
-					: this.plugin.settings.headerLevelForContact === 3
-						? "rd"
-						: this.plugin.settings.headerLevelForContact === 1
-							? "st"
-							: "th";
-			const atTheLevel =
-				this.plugin.settings.headerLevelForContact === 0
-					? "at the 1st level"
-					: `at the ${this.plugin.settings.headerLevelForContact}${snRdTh} level`;
-			//Begin headerLevelForContact option
-			new Setting(this.containerEl)
-				.setName("Header level for contact name")
-				.addSlider((slider) => {
-					slider
-						.setLimits(0, 6, 1)
-						.setValue(this.plugin.settings.headerLevelForContact)
-						.onChange(async (value: number) => {
-							this.plugin.settings.headerLevelForContact = value;
-							await this.plugin.saveSettings();
-						});
-					slider.sliderEl.onmouseleave = () => {
-						this.display();
-					};
-					slider.sliderEl.ariaLabel = `Header level for contact name\nCurrent: ${this.plugin.settings.headerLevelForContact}`;
-				});
-			//End headerLevelForContact option
-
-			// Begin appendAsHeader option
-			new Setting(this.containerEl).setName("Add new header").setHeading();
-			new Setting(this.containerEl)
-				.setName("Append as header if it doesn't exist")
-				.setDesc(
-					`If the header doesn't exist when ${this.plugin.settings.triggerSymbol} linking, add an option to create the header ${atTheLevel} in the end of the file.`,
-				)
-				.addToggle((toggle) =>
-					toggle
-						.setValue(this.plugin.settings.appendAsHeader)
-						.onChange(async (value: boolean) => {
-							this.plugin.settings.appendAsHeader = value;
-							await this.plugin.saveSettings();
-						}),
-				);
-			// End appendAsHeader option
-		} else {
-			// Begin limitLinksToFolders option: limit which folders links are sourced from
-			const ruleDesc = document.createDocumentFragment();
-			ruleDesc.append(
-				`${this.plugin.settings.triggerSymbol} linking will only source links from the following folders.`,
-				ruleDesc.createEl("br"),
-				`For example, you might only want contacts in the Contacts/ folder to be linked when you type ${this.plugin.settings.triggerSymbol}.`,
-				ruleDesc.createEl("br"),
-				ruleDesc.createEl("em", {
-					text: "If no folders are added, links will be sourced from all folders.",
-				}),
-			);
-
-			new Setting(this.containerEl)
-				.setName("Limit links to folders")
-				.setHeading()
-				.setDesc(ruleDesc)
-				.addButton((button: ButtonComponent) => {
-					button
-						.setTooltip("Add limit folder")
-						.setButtonText("+")
-						.setCta()
-						.onClick(async () => {
-							this.plugin.settings.limitToDirectories.push({
-								path: "",
-								triggerSymbol: this.plugin.settings.triggerSymbol,
-								extensions: ["md"],
-							});
-							this.plugin.settings._enableOneFile = false;
-							await this.plugin.saveSettings();
-							return this.display();
-						});
-				});
-
-			this.plugin.settings.limitToDirectories.forEach((directory, index) => {
-				const newDirectorySetting = new Setting(this.containerEl)
-					.setClass("at-symbol-linking-folder-container")
-					.addSearch((cb) => {
-						cb.setPlaceholder("Folder").setValue(directory.path);
-						new FolderSuggester(cb.inputEl, this.app, async (result) => {
-							this.plugin.settings.limitToDirectories[index].path = result.trim();
-							await this.plugin.saveSettings();
-						});
-						cb.inputEl.onblur = async () => {
-							await this.validate();
-						};
-					})
-					.addText((text) => {
-						text
-							.setPlaceholder("Trigger symbol")
-							.setValue(directory.triggerSymbol ?? this.plugin.settings.triggerSymbol)
-							.onChange(async (value) => {
-								this.plugin.settings.limitToDirectories[index].triggerSymbol = value;
-								await this.plugin.saveSettings();
-							})
-							.inputEl.addClass("min-width");
-					})
-					.addText((text) => {
-						text.setPlaceholder("Extensions");
-						text.setValue(directory.extensions?.join(", ") ?? "md");
-						text.onChange(async (value) => {
-							let res = value
-								.split(/[\n ,]+/)
-								.map((ext) => ext.trim().replace(/^\./, ""));
-							if (value.length === 0) res = ["md"];
-							this.plugin.settings.limitToDirectories[index].extensions = res;
-							await this.plugin.saveSettings();
-						});
-						text.inputEl.onblur = () => {
-							this.display();
-						};
-					})
-					.addExtraButton((cb) => {
-						cb.setIcon("up-chevron-glyph")
-							.setTooltip("Move up")
-							.onClick(async () => {
-								arrayMove(this.plugin.settings.limitToDirectories, index, index - 1);
-								await this.plugin.saveSettings();
-								this.display();
-							});
-					})
-					.addExtraButton((cb) => {
-						cb.setIcon("down-chevron-glyph")
-							.setTooltip("Move down")
-							.onClick(async () => {
-								arrayMove(this.plugin.settings.limitToDirectories, index, index + 1);
-								await this.plugin.saveSettings();
-								this.display();
-							});
-					})
-					.addExtraButton((cb) => {
-						cb.setIcon("cross")
-							.setTooltip("Delete")
-							.onClick(async () => {
-								this.plugin.settings.limitToDirectories.splice(index, 1);
-								await this.plugin.saveSettings();
-								this.display();
-							});
-					});
-				newDirectorySetting.controlEl.addClass("at-symbol-linking-folder-setting");
-				newDirectorySetting.infoEl.remove();
-			});
-			// End limitLinksToFolders option
-
-			new Setting(this.containerEl).setName("Add new note").setHeading();
-
-			// Begin add new note option
-			new Setting(this.containerEl)
-				.setName("Add new note if it doesn't exist")
-				.setDesc(
-					`If the note doesn't exist when ${this.plugin.settings.triggerSymbol} linking, add an option to create the note.`,
-				)
-				.addToggle((toggle) =>
-					toggle
-						.setValue(this.plugin.settings.showAddNewNote)
-						.onChange(async (value: boolean) => {
-							this.plugin.settings.showAddNewNote = value;
-							await this.plugin.saveSettings();
-							this.display();
-						}),
-				);
-			// End add new note option
-
-			if (this.plugin.settings.showAddNewNote) {
-				// Begin add new note template folder
-				const newNoteTemplateDesc = document.createDocumentFragment();
-				newNoteTemplateDesc.append(
-					`Template to use when creating a new note from ${this.plugin.settings.triggerSymbol} link.`,
-					newNoteTemplateDesc.createEl("br"),
-					"Uses formats from the ",
-					newNoteTemplateDesc.createEl("a", {
-						text: "core templates plugin",
-						href: "https://help.obsidian.md/Plugins/Templates",
-					}),
-					" to replace the following variables in the template:",
-					newNoteTemplateDesc.createEl("br"),
-					newNoteTemplateDesc.createEl("code", {
-						text: "{{title}}",
-					}),
-					" - The title of the new file",
-					newNoteTemplateDesc.createEl("br"),
-					newNoteTemplateDesc.createEl("code", {
-						text: "{{date}}",
-					}),
-					" - The current date",
-					newNoteTemplateDesc.createEl("br"),
-					newNoteTemplateDesc.createEl("code", {
-						text: "{{time}}",
-					}),
-					" - The current time",
-				);
-				new Setting(this.containerEl)
-					.setName("Add new note template")
-					.setDesc(newNoteTemplateDesc)
-					.addSearch((cb) => {
-						cb.setPlaceholder("No template (blank note)").setValue(
-							this.plugin.settings.addNewNoteTemplateFile,
-						);
-						new FileSuggestWithPath(cb.inputEl, this.app, true, async (newFile) => {
-							this.plugin.settings.addNewNoteTemplateFile = newFile.path.replace(
-								/\.md$/,
-								"",
-							);
-							await this.plugin.saveSettings();
-						});
-						cb.inputEl.onblur = async () => {
-							await this.validate();
-						};
-					});
-				// End add new note template folder
-
-				// Begin add new note directory
-				new Setting(this.containerEl)
-					.setName("Add new note folder")
-					.setDesc(
-						`Folder to create new notes in when using ${this.plugin.settings.triggerSymbol} linking. If the limit directories is used, the folder will be the limited directory selected by the trigger.`,
-					)
-					.addSearch((cb) => {
-						cb.setPlaceholder("No folder (root)").setValue(
-							this.plugin.settings.addNewNoteDirectory,
-						);
-						new FolderSuggester(cb.inputEl, this.app, async (result) => {
-							this.plugin.settings.addNewNoteDirectory = result.trim();
-							await this.plugin.saveSettings();
-						});
-						cb.inputEl.onblur = async () => {
-							await this.validate();
-						};
-					});
-				// End add new note directory
-			}
-		}
-
-		new Setting(this.containerEl).setName("Suggestion popup behavior").setHeading();
-
-		// Begin useCompatibilityMode option
-		const useCompatibilityModeDesc = document.createDocumentFragment();
-		useCompatibilityModeDesc.append(
-			useCompatibilityModeDesc.createEl("br"),
-			"Renders an HTML popup in place of the native Obsidian popup.",
-			useCompatibilityModeDesc.createEl("br"),
-			"Useful if your others plugins are interfering with the popup (e.g. the Tasks plugin).",
-			useCompatibilityModeDesc.createEl("br"),
-			useCompatibilityModeDesc.createEl("em", {
-				text: "May be slower than the native popup.",
-			}),
-		);
-		new Setting(this.containerEl)
-			.setName("Use compatibility mode")
-			.setDesc(useCompatibilityModeDesc)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.useCompatibilityMode)
-					.onChange(async (value: boolean) => {
-						this.shouldReset = true;
-						this.plugin.settings.useCompatibilityMode = value;
-						await this.plugin.saveSettings();
-						this.plugin.registerPopup();
-						this.display();
-					}),
-			);
-		// End useCompatibilityMode option
-
-		// Begin leavePopupOpenForXSpaces option
-		const leavePopupOpenDesc = document.createDocumentFragment();
-		leavePopupOpenDesc.append(
-			`When ${this.plugin.settings.triggerSymbol} linking, you might want to type a full name e.g. "Brandon Sanderson" without the popup closing.`,
-			leavePopupOpenDesc.createEl("br"),
-			leavePopupOpenDesc.createEl("em", {
-				text: "When set above 0, you'll need to press escape, return/enter, or type over X spaces to close the popup.",
-			}),
-		);
-		new Setting(this.containerEl)
-			.setName("Leave popup open for X spaces")
-			.setDesc(leavePopupOpenDesc)
-			.addText((text) => {
-				text
-					.setPlaceholder("0")
-					.setValue(this.plugin.settings.leavePopupOpenForXSpaces?.toString())
-					.onChange(async (value) => {
-						this.plugin.settings.leavePopupOpenForXSpaces = parseInt(value, 10);
-						await this.plugin.saveSettings();
-					});
-				text.inputEl.onblur = async () => {
-					await this.validate();
-				};
-			});
-		// End leavePopupOpenForXSpaces option
-
-		new Setting(this.containerEl).setName("Advanced").setHeading();
-
-		// Begin invalid character regex option
-		const invalidCharacterRegexDesc = document.createDocumentFragment();
-		invalidCharacterRegexDesc.append(
-			invalidCharacterRegexDesc.createEl("br"),
-			"Characters typed that match this regex will not be included in the final search query in compatibility mode.",
-			invalidCharacterRegexDesc.createEl("br"),
-			"In normal mode, the popup will close when an invalid character is typed.",
-		);
-
-		new Setting(this.containerEl)
-			.setName("Invalid character Regex")
-			.setDesc(invalidCharacterRegexDesc)
-			.addText((text) => {
-				text
-					.setPlaceholder(this.plugin.settings.invalidCharacterRegex)
-					.setValue(this.plugin.settings.invalidCharacterRegex)
-					.onChange(async (value) => {
-						this.plugin.settings.invalidCharacterRegex = value;
-						await this.plugin.saveSettings();
-					});
-				text.inputEl.onblur = async () => {
-					await this.validate("invalidCharacterRegex");
-				};
-			});
-		// End valid character regex option
-
-		// Begin valid character regex flags option
-		const invalidCharacterRegexFlagsDesc = document.createDocumentFragment();
-		invalidCharacterRegexFlagsDesc.append(
-			"Flags to use with the invalid character regex.",
-		);
-
-		new Setting(this.containerEl)
-			.setName("Invalid character Regex flags")
-			.setDesc(invalidCharacterRegexFlagsDesc)
-			.addText((text) => {
-				text
-					.setPlaceholder(this.plugin.settings.invalidCharacterRegexFlags)
-					.setValue(this.plugin.settings.invalidCharacterRegexFlags)
-					.onChange(async (value) => {
-						this.plugin.settings.invalidCharacterRegexFlags = value;
-						await this.plugin.saveSettings();
-					});
-				text.inputEl.onblur = async () => {
-					await this.validate("invalidCharacterRegexFlags");
-				};
-			});
-		// End valid character regex flags option
-
-		// Begin remove accents option
-		new Setting(this.containerEl)
-			.setName("Remove accents from search query")
-			.setDesc("e.g. é -> e when searching or creating links via the popup.")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.removeAccents)
-					.onChange(async (value: boolean) => {
-						this.plugin.settings.removeAccents = value;
-						await this.plugin.saveSettings();
-					}),
-			);
+		return super.getControlValue(key);
 	}
 
-	async validate(editedSetting?: string) {
-		const settings = this.plugin.settings;
-		const updateSetting = async (setting: keyof CustomSuggester, value: any) => {
-			// @ts-expect-error update setting with any
-			this.plugin.settings[setting] = value;
-			await this.plugin.saveSettings();
-			return this.display();
+	async setControlValue(key: string, value: unknown): Promise<void> {
+		if (key === TEMPLATE_KEY && typeof value === "string")
+			value = value.replace(/\.md$/, "");
+		await super.setControlValue(key, value);
+	}
+
+	getSettingDefinitions(): SettingDefinitionItem<keyof CustomSuggester>[] {
+		const isOneFileMode = () => this.plugin.settings._enableOneFile;
+
+		return [
+			{
+				name: "Default symbol (trigger)",
+				desc: "Type this symbol to trigger the popup.",
+				control: {
+					type: "text",
+					key: "triggerSymbol",
+					placeholder: "@",
+					validate: (value) =>
+						value.length !== 1 ? "Trigger symbol must be a single character." : undefined,
+				},
+			},
+			{
+				name: "Include the trigger symbol",
+				desc: "Prefix the final link text with the trigger symbol, e.g. [@evan](./evan).",
+				control: { type: "toggle", key: "includeSymbol" },
+			},
+			this.limitList("file"),
+			this.limitList("folder"),
+			{
+				name: "Header level for contact name",
+				desc: "Headings at this level are used as contact names. 0 includes all headings.",
+				visible: isOneFileMode,
+				control: {
+					type: "slider",
+					key: "headerLevelForContact",
+					min: 0,
+					max: 6,
+					step: 1,
+				},
+			},
+			{
+				type: "group",
+				heading: "Add new header",
+				visible: isOneFileMode,
+				items: [
+					{
+						name: "Append as header if it doesn't exist",
+						desc: "Offer to create the missing header at the end of the file.",
+						control: { type: "toggle", key: "appendAsHeader" },
+					},
+				],
+			},
+			{
+				type: "group",
+				heading: "Add new note",
+				visible: () => !isOneFileMode(),
+				items: [
+					{
+						name: "Add new note if it doesn't exist",
+						desc: "Offer to create the note when no existing note matches.",
+						control: { type: "toggle", key: "showAddNewNote" },
+					},
+					{
+						name: "Add new note template",
+						desc: createTemplateDesc(),
+						visible: () => this.plugin.settings.showAddNewNote,
+						control: {
+							type: "file",
+							key: TEMPLATE_KEY,
+							placeholder: "No template (blank note)",
+							filter: (file) => file.extension === "md",
+							validate: (value) => {
+								if (
+									value &&
+									!(this.app.vault.getAbstractFileByPath(value) instanceof TFile)
+								)
+									return `Unable to find template file at path: ${value}`;
+								return undefined;
+							},
+						},
+					},
+					{
+						name: "Add new note folder",
+						desc: "Folder for new notes. A limited folder matching the trigger takes precedence.",
+						visible: () => this.plugin.settings.showAddNewNote,
+						control: {
+							type: "folder",
+							key: "addNewNoteDirectory",
+							placeholder: "No folder (root)",
+							validate: (value) => {
+								if (
+									value &&
+									!(this.app.vault.getAbstractFileByPath(value) instanceof TFolder)
+								)
+									return `Unable to find folder at path: ${value}`;
+								return undefined;
+							},
+						},
+					},
+				],
+			},
+			{
+				type: "group",
+				heading: "Suggestion popup behavior",
+				items: [
+					{
+						name: "Use compatibility mode",
+						desc: "Render an HTML popup instead of the native one, for plugins that interfere with it (e.g. Tasks).",
+						render: (setting) => {
+							setting.addToggle((toggle) =>
+								toggle
+									.setValue(this.plugin.settings.useCompatibilityMode)
+									.onChange(async (value) => {
+										this.shouldReset = true;
+										this.plugin.settings.useCompatibilityMode = value;
+										await this.plugin.saveSettings();
+										this.plugin.registerPopup();
+									}),
+							);
+						},
+					},
+					{
+						name: "Leave popup open for X spaces",
+						desc: "Keep the popup open while typing multi-word names. Escape or Enter still closes it.",
+						control: {
+							type: "number",
+							key: "leavePopupOpenForXSpaces",
+							min: 0,
+							step: 1,
+							placeholder: "0",
+							defaultValue: 0,
+						},
+					},
+				],
+			},
+			{
+				type: "group",
+				heading: "Advanced",
+				items: [
+					{
+						name: "Invalid character regex",
+						desc: "Typed characters matching this regex close the popup, or are ignored in compatibility mode.",
+						control: {
+							type: "text",
+							key: "invalidCharacterRegex",
+							placeholder: DEFAULT_SETTINGS.invalidCharacterRegex,
+							validate: (value) =>
+								validateRegex(value, this.plugin.settings.invalidCharacterRegexFlags),
+						},
+					},
+					{
+						name: "Invalid character regex flags",
+						desc: "Flags to use with the invalid character regex.",
+						control: {
+							type: "text",
+							key: "invalidCharacterRegexFlags",
+							placeholder: DEFAULT_SETTINGS.invalidCharacterRegexFlags,
+							validate: (value) =>
+								validateRegex(this.plugin.settings.invalidCharacterRegex, value),
+						},
+					},
+					{
+						name: "Remove accents from search query",
+						desc: "e.g. é -> e when searching or creating links via the popup.",
+						control: { type: "toggle", key: "removeAccents" },
+					},
+				],
+			},
+		];
+	}
+
+	/**
+	 * Files and folders limits are mutually exclusive: only one of the two lists
+	 * is shown, depending on which one holds entries.
+	 */
+	private limitList(kind: LimitKind): SettingDefinitionList<keyof CustomSuggester> {
+		const isFolder = kind === "folder";
+		const entries = () =>
+			isFolder
+				? this.plugin.settings.limitToDirectories
+				: this.plugin.settings.limitToFile;
+		// Files win over folders (as in the suggester), so if both were set by an
+		// old config, the file list stays reachable to clean it up.
+		const visible = () => {
+			const { limitToFile, limitToDirectories } = this.plugin.settings;
+			return isFolder
+				? limitToFile.length === 0
+				: limitToFile.length > 0 || limitToDirectories.length === 0;
 		};
 
-		// triggerSymbol should be a single character
-		if (settings.triggerSymbol.length !== 1) {
-			new Notice(`Trigger symbol must be a single character.`);
-			await updateSetting(
-				"triggerSymbol",
-				settings.triggerSymbol.length ? settings.triggerSymbol[0] : "@",
-			);
-		}
+		const items: SettingDefinition<keyof CustomSuggester>[] = entries().map(
+			(entry, index) => ({
+				name: entry.path || "(no path)",
+				desc: describeEntry(entry, isFolder),
+				searchable: false,
+				action: () => this.openLimitModal(kind, index),
+			}),
+		);
 
-		// Folders should exist
-		for (let i = 0; i < settings.limitToDirectories.length; i++) {
-			const folder = settings.limitToDirectories[i];
-			if (folder.path === "") {
-				continue;
-			}
-			const folderFile = this.app.vault.getAbstractFileByPath(folder.path);
-			if (!folderFile) {
-				new Notice(
-					`Unable to find folder at path: ${folder.path}. Please add it if you want to limit links to this folder.`,
-				);
-				const newFolders = [...settings.limitToDirectories];
-				newFolders[i].path = "";
-				await updateSetting("limitToDirectories", newFolders);
-			}
-		}
-
-		// Template file should exist when add new note option is enabled
-		if (settings.showAddNewNote && settings.addNewNoteTemplateFile) {
-			const templateFile = this.app.vault.getAbstractFileByPath(
-				`${settings.addNewNoteTemplateFile}.md`,
-			);
-			if (!templateFile) {
-				new Notice(
-					`Unable to find template file at path: ${settings.addNewNoteTemplateFile}.md`,
-				);
-				await updateSetting("addNewNoteTemplateFile", "");
-			}
-		}
-
-		// Destination directory should exist when add new note option is enabled
-		if (settings.showAddNewNote && settings.addNewNoteDirectory) {
-			const templateFile = this.app.vault.getAbstractFileByPath(
-				`${settings.addNewNoteDirectory}`,
-			);
-			if (!templateFile) {
-				new Notice(
-					`Unable to find folder for new notes at path: ${settings.addNewNoteDirectory}. Please add it if you want to create new notes in this folder.`,
-				);
-				await updateSetting("addNewNoteDirectory", "");
-			}
-		}
-
-		// Leave popup open for X spaces should be a number
-		if (
-			isNaN(parseInt(settings.leavePopupOpenForXSpaces.toString())) ||
-			settings.leavePopupOpenForXSpaces < 0
-		) {
-			await updateSetting("leavePopupOpenForXSpaces", 0);
-		}
-
-		// Regex should be valid and not be empty
-		if (settings.invalidCharacterRegex?.trim() === "") {
-			await updateSetting(
-				"invalidCharacterRegex",
-				DEFAULT_SETTINGS.invalidCharacterRegex,
-			);
-		}
-		try {
-			new RegExp(settings.invalidCharacterRegex, settings.invalidCharacterRegexFlags);
-		} catch (e) {
-			new Notice(`Invalid regex or flags`);
-			if (editedSetting === "invalidCharacterRegex") {
-				await updateSetting(
-					"invalidCharacterRegex",
-					DEFAULT_SETTINGS.invalidCharacterRegex,
-				);
-			} else if (editedSetting === "invalidCharacterRegexFlags") {
-				await updateSetting(
-					"invalidCharacterRegexFlags",
-					DEFAULT_SETTINGS.invalidCharacterRegexFlags,
-				);
-			}
-		}
+		return {
+			type: "list",
+			heading: isFolder ? "Limit links to folders" : "Limit links to files",
+			visible,
+			emptyState: isFolder
+				? "No folder added: links are sourced from all folders."
+				: "No file added: links are sourced from folders. Add a file to use its headings as contacts.",
+			addItem: {
+				name: isFolder ? "Add folder" : "Add file",
+				action: () => this.openLimitModal(kind),
+			},
+			onReorder: (oldIndex, newIndex) => {
+				const list = entries();
+				const [moved] = list.splice(oldIndex, 1);
+				if (moved) list.splice(newIndex, 0, moved);
+				void this.saveLimits();
+			},
+			onDelete: (index) => {
+				entries().splice(index, 1);
+				void this.saveLimits();
+			},
+			items,
+		};
 	}
+
+	private openLimitModal(kind: LimitKind, index?: number) {
+		const list =
+			kind === "folder"
+				? this.plugin.settings.limitToDirectories
+				: this.plugin.settings.limitToFile;
+		const initial: CustomTriggerPerLimit = (index !== undefined && list[index]) || {
+			path: "",
+			triggerSymbol: this.plugin.settings.triggerSymbol,
+			extensions: kind === "folder" ? ["md"] : undefined,
+		};
+		new LimitEntryModal(this.app, kind, initial, async (entry) => {
+			if (index === undefined) list.push(entry);
+			else list[index] = entry;
+			await this.saveLimits();
+		}).open();
+	}
+
+	/** Persist list changes, keep the one-file mode flag in sync and rebuild the tab. */
+	private async saveLimits() {
+		const settings = this.plugin.settings;
+		settings._enableOneFile = settings.limitToFile.length > 0;
+		await this.plugin.saveSettings();
+		this.update();
+	}
+}
+
+function describeEntry(entry: CustomTriggerPerLimit, isFolder: boolean): string {
+	const parts = [`Trigger: ${entry.triggerSymbol ?? "default"}`];
+	if (isFolder) parts.push(`Extensions: ${(entry.extensions ?? ["md"]).join(", ")}`);
+	return parts.join(" · ");
+}
+
+function validateRegex(regex: string, flags: string): string | undefined {
+	if (!regex.trim()) return "Regex cannot be empty.";
+	try {
+		new RegExp(regex, flags);
+	} catch {
+		return "Invalid regex or flags.";
+	}
+	return undefined;
+}
+
+function createTemplateDesc(): DocumentFragment {
+	return createFragment((desc) => {
+		desc.append("Replaces ");
+		desc.createEl("code", { text: "{{title}}" });
+		desc.append(", ");
+		desc.createEl("code", { text: "{{date}}" });
+		desc.append(" and ");
+		desc.createEl("code", { text: "{{time}}" });
+		desc.append(" using the ");
+		desc.createEl("a", {
+			text: "core templates plugin",
+			href: "https://help.obsidian.md/Plugins/Templates",
+		});
+		desc.append(" formats.");
+	});
 }

@@ -7,38 +7,32 @@ import {
 	type EditorSuggestContext,
 	type EditorSuggestTriggerInfo,
 } from "obsidian";
+import type { CustomSuggester } from "../settings/interface";
 import {
 	sharedGetMonoFileSuggestion,
 	sharedGetSuggestions,
-} from "src/shared-suggestion/sharedGetSuggestions";
-import sharedRenderSuggestion from "src/shared-suggestion/sharedRenderSuggestion";
-import { sharedSelectSuggestion } from "src/shared-suggestion/sharedSelectSuggestion";
-import type { FileOption } from "src/types";
-import { isValidFileNameCharacter, removeAccents } from "src/utils/valid-file-name";
-import type { CustomSuggester } from "../settings/interface";
+} from "../shared-suggestion/sharedGetSuggestions";
+import sharedRenderSuggestion from "../shared-suggestion/sharedRenderSuggestion";
+import { sharedSelectSuggestion } from "../shared-suggestion/sharedSelectSuggestion";
+import type { FileSuggestion } from "../types";
+import { isValidFileNameCharacter, removeAccents } from "../utils/valid-file-name";
 
-//@ts-ignore
-export default class SuggestionPopup extends EditorSuggest<
-	Fuzzysort.KeysResult<FileOption>
-> {
+export default class SuggestionPopup extends EditorSuggest<FileSuggestion> {
 	private readonly settings: CustomSuggester;
 	private typedChar: string;
-	private originalQuery: string;
+	private originalQuery = "";
 
 	private firstOpenedCursor: null | EditorPosition = null;
 	private focused = false;
-	private readonly app: App;
 	public name = "Symbol linking suggest";
 
 	constructor(app: App, settings: CustomSuggester) {
 		super(app);
-		this.app = app;
 		this.settings = settings;
 		this.typedChar = settings.triggerSymbol;
 
 		//Remove default key registrations
-		const self = this as any;
-		self.scope.keys = [];
+		this.scope.keys = [];
 	}
 
 	open() {
@@ -51,7 +45,7 @@ export default class SuggestionPopup extends EditorSuggest<
 		this.focused = false;
 	}
 
-	getSuggestions(context: EditorSuggestContext): Fuzzysort.KeysResult<FileOption>[] {
+	getSuggestions(context: EditorSuggestContext): FileSuggestion[] {
 		if (this.settings.limitToFile.length > 0)
 			return sharedGetMonoFileSuggestion(
 				context.query,
@@ -86,12 +80,9 @@ export default class SuggestionPopup extends EditorSuggest<
 
 		// If user's cursor is inside a code block, don't attempt to link
 		let isInCodeBlock = false;
-		if ((editor as any)?.cm) {
-			const cm = (editor as any).cm;
-			const cursor = cm.state?.selection?.main as {
-				from: number;
-				to: number;
-			};
+		const cm = editor.cm as typeof editor.cm | undefined;
+		if (cm) {
+			const cursor = cm.state.selection.main;
 			syntaxTree(cm.state).iterate({
 				from: cursor.from,
 				to: cursor.to,
@@ -159,7 +150,7 @@ export default class SuggestionPopup extends EditorSuggest<
 		};
 	}
 
-	renderSuggestion(value: Fuzzysort.KeysResult<FileOption>, el: HTMLElement): void {
+	renderSuggestion(value: FileSuggestion, el: HTMLElement): void {
 		sharedRenderSuggestion(
 			value,
 			el,
@@ -168,15 +159,18 @@ export default class SuggestionPopup extends EditorSuggest<
 		);
 	}
 
-	async selectSuggestion(value: Fuzzysort.KeysResult<FileOption>): Promise<void> {
-		const line =
-			this.context?.editor.getRange(
-				{
-					line: this.context.start.line,
-					ch: 0,
-				},
-				this.context.end,
-			) || "";
+	selectSuggestion(value: FileSuggestion): void {
+		void this.insertSuggestion(value);
+	}
+
+	private async insertSuggestion(value: FileSuggestion): Promise<void> {
+		// The context is reset when the popup closes, so keep it across the await
+		const context = this.context;
+		if (!context) return;
+		const line = context.editor.getRange(
+			{ line: context.start.line, ch: 0 },
+			context.end,
+		);
 
 		const linkText = await sharedSelectSuggestion(
 			this.app,
@@ -185,13 +179,13 @@ export default class SuggestionPopup extends EditorSuggest<
 			this.originalQuery,
 			value,
 		);
-		this.context?.editor.replaceRange(
+		context.editor.replaceRange(
 			linkText,
 			{
-				line: this.context.start.line,
+				line: context.start.line,
 				ch: line.lastIndexOf(this.typedChar),
 			},
-			this.context.end,
+			context.end,
 		);
 
 		// Close suggestion popup
@@ -204,11 +198,10 @@ export default class SuggestionPopup extends EditorSuggest<
 			dir = dir === SelectionDirection.PREVIOUS ? dir : SelectionDirection.NONE;
 		}
 
-		const self = this as any;
 		// HACK: The second parameter has to be an instance of KeyboardEvent to force scrolling the selected item into
 		// view
-		self.suggestions.setSelectedItem(
-			self.suggestions.selectedItem + dir,
+		this.suggestions.setSelectedItem(
+			this.suggestions.selectedItem + dir,
 			new KeyboardEvent("keydown"),
 		);
 	}
@@ -219,18 +212,16 @@ export default class SuggestionPopup extends EditorSuggest<
 		return null;
 	}
 
-	getSelectedItem(): Fuzzysort.KeysResult<FileOption> {
-		const self = this as any;
-		return self.suggestions.values[self.suggestions.selectedItem];
+	getSelectedItem(): FileSuggestion | undefined {
+		return this.suggestions.values?.[this.suggestions.selectedItem];
 	}
 
 	applySelectedItem() {
-		const self = this as any;
-		self.suggestions.useSelectedItem();
+		this.suggestions.useSelectedItem(new KeyboardEvent("keydown"));
 	}
 
 	isVisible(): boolean {
-		return (this as any).isOpen;
+		return this.isOpen;
 	}
 
 	isFocused(): boolean {

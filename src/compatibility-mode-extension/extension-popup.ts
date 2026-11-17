@@ -5,61 +5,59 @@
  * It is optional and can be enabled in the settings. By default, it is disabled and use the last API for editor inputs.
  */
 
-import { type Instance as PopperInstance, createPopper } from "@popperjs/core";
 // Code derived from https://github.com/farux/obsidian-auto-note-mover
-import { type App, Platform, Scope } from "obsidian";
-import type { ISuggestOwner as IOwner } from "obsidian";
+import { type App, type ISuggestOwner as IOwner, Platform, Scope } from "obsidian";
+import type { CustomSuggester } from "../settings/interface";
 import {
 	sharedGetMonoFileSuggestion,
 	sharedGetSuggestions,
-} from "src/shared-suggestion/sharedGetSuggestions";
-import sharedRenderSuggestion from "src/shared-suggestion/sharedRenderSuggestion";
-import { sharedSelectSuggestion } from "src/shared-suggestion/sharedSelectSuggestion";
-import type { FileOption } from "src/types";
-import type { CustomSuggester } from "../settings/interface";
+} from "../shared-suggestion/sharedGetSuggestions";
+import sharedRenderSuggestion from "../shared-suggestion/sharedRenderSuggestion";
+import { sharedSelectSuggestion } from "../shared-suggestion/sharedSelectSuggestion";
+import type { FileSuggestion } from "../types";
 import { removeAccents } from "../utils/valid-file-name";
+
+/** Height of an editor line: the anchor is placed this far below the line's top. */
+export const LINE_HEIGHT = 24;
 
 export class Suggest<T> {
 	private owner: IOwner<T>;
-	private values: T[];
-	private suggestions: HTMLDivElement[];
-	private selectedItem: number;
+	private values: T[] = [];
+	private suggestions: HTMLElement[] = [];
+	private selectedItem = 0;
 	private containerEl: HTMLElement;
 
 	constructor(owner: IOwner<T>, containerEl: HTMLElement, scope: Scope) {
 		this.owner = owner;
 		this.containerEl = containerEl;
 
-		containerEl.on("click", ".suggestion-item", this.onSuggestionClick.bind(this));
-		containerEl.on(
-			"mousemove",
-			".suggestion-item",
-			this.onSuggestionMouseover.bind(this),
+		containerEl.on("click", ".suggestion-item", (event, el) =>
+			this.onSuggestionClick(event, el),
+		);
+		containerEl.on("mousemove", ".suggestion-item", (_event, el) =>
+			this.onSuggestionMouseover(el),
 		);
 
 		scope.register([], "ArrowUp", (event) => {
-			if (!event.isComposing) {
-				this.setSelectedItem(this.selectedItem - 1, true);
-				return false;
-			}
+			if (event.isComposing) return true;
+			this.setSelectedItem(this.selectedItem - 1, true);
+			return false;
 		});
 
 		scope.register([], "ArrowDown", (event) => {
-			if (!event.isComposing) {
-				this.setSelectedItem(this.selectedItem + 1, true);
-				return false;
-			}
+			if (event.isComposing) return true;
+			this.setSelectedItem(this.selectedItem + 1, true);
+			return false;
 		});
 
 		scope.register([], "Enter", (event) => {
-			if (!event.isComposing) {
-				this.useSelectedItem(event);
-				return false;
-			}
+			if (event.isComposing) return true;
+			this.useSelectedItem(event);
+			return false;
 		});
 	}
 
-	onSuggestionClick(event: MouseEvent, el: HTMLDivElement): void {
+	onSuggestionClick(event: MouseEvent, el: HTMLElement): void {
 		event.preventDefault();
 
 		const item = this.suggestions.indexOf(el);
@@ -67,14 +65,14 @@ export class Suggest<T> {
 		this.useSelectedItem(event);
 	}
 
-	onSuggestionMouseover(_event: MouseEvent, el: HTMLDivElement): void {
+	onSuggestionMouseover(el: HTMLElement): void {
 		const item = this.suggestions.indexOf(el);
 		this.setSelectedItem(item, false);
 	}
 
 	setSuggestions(values: T[]) {
 		this.containerEl.empty();
-		const suggestionEls: HTMLDivElement[] = [];
+		const suggestionEls: HTMLElement[] = [];
 
 		values.forEach((value) => {
 			const suggestionEl = this.containerEl.createDiv("suggestion-item");
@@ -105,22 +103,21 @@ export class Suggest<T> {
 		this.selectedItem = normalizedIndex;
 
 		if (scrollIntoView) {
-			selectedSuggestion.scrollIntoView(false);
+			selectedSuggestion?.scrollIntoView(false);
 		}
 	}
 }
 
-export class LinkSuggest implements IOwner<Fuzzysort.KeysResult<FileOption>> {
+export class LinkSuggest implements IOwner<FileSuggestion> {
 	protected app: App;
 	protected inputEl: HTMLDivElement;
 	protected settings: CustomSuggester;
 	private readonly triggerSymbol: string;
-	private popper: PopperInstance;
 	private readonly scope: Scope;
 	private readonly suggestEl: HTMLElement;
-	private suggest: Suggest<Fuzzysort.KeysResult<FileOption>>;
+	private suggest: Suggest<FileSuggestion>;
 	private readonly onSelect: (linkText: string) => void;
-	private originalQuery: string;
+	private originalQuery = "";
 
 	constructor(
 		app: App,
@@ -136,22 +133,19 @@ export class LinkSuggest implements IOwner<Fuzzysort.KeysResult<FileOption>> {
 		this.onSelect = onSelect;
 		this.triggerSymbol = triggerSymbol;
 
-		this.suggestEl = createDiv("suggestion-container");
+		this.suggestEl = createDiv("suggestion-container at-symbol-linking-compat-popup");
 		if (Platform.isMobile) {
-			this.suggestEl.style.padding = "0";
+			this.suggestEl.addClass("is-mobile");
 		} else {
 			this.suggestEl.addClass("extension-container-at-symbol-linking");
 		}
-		this.suggestEl.style.zIndex = "1000";
 		const suggestion = this.suggestEl.createDiv("suggestion");
 		suggestion.id = "at-symbol-suggestion-container";
 		this.suggest = new Suggest(this, suggestion, this.scope);
 
-		this.scope.register([], "Escape", this.close.bind(this));
+		this.scope.register([], "Escape", () => this.close());
 
-		this.inputEl.addEventListener("focus", this.onInputChanged.bind(this));
-		this.inputEl.addEventListener("blur", this.close.bind(this));
-		this.suggestEl.on("mousedown", ".suggestion-container", (event: MouseEvent) => {
+		this.suggestEl.on("mousedown", ".suggestion-container", (event) => {
 			event.preventDefault();
 		});
 	}
@@ -161,62 +155,44 @@ export class LinkSuggest implements IOwner<Fuzzysort.KeysResult<FileOption>> {
 
 		if (suggestions.length > 0) {
 			this.suggest.setSuggestions(suggestions);
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			this.open((<any>this.app).dom.appContainerEl, this.inputEl);
+			this.open(this.app.dom.appContainerEl);
 		}
 	}
 
-	open(container: HTMLElement, inputEl: HTMLElement): void {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		(<any>this.app).keymap.pushScope(this.scope);
+	open(container: HTMLElement): void {
+		this.app.keymap.pushScope(this.scope);
 
 		container.appendChild(this.suggestEl);
-		this.popper = createPopper(inputEl, this.suggestEl, {
-			placement: Platform.isMobile ? "top" : "bottom-start",
-			modifiers: [
-				{
-					name: "flip",
-					options: {
-						flipVariations: false,
-						fallbackPlacements: [Platform.isMobile ? "top" : "right"],
-					},
-				},
-				{
-					name: "sameWidth",
-					enabled: true,
-					fn: ({ state, instance }) => {
-						// Note: positioning needs to be calculated twice -
-						// first pass - positioning it according to the width of the popper
-						// second pass - position it with the width bound to the reference element
-						// we need to early exit to avoid an infinite loop
-						const targetWidth = Platform.isMobile
-							? "100vw"
-							: `${state.rects.reference.width}px`;
-						if (state.styles.popper.width === targetWidth) {
-							return;
-						}
-						state.styles.popper.width = targetWidth;
-						instance.update();
-					},
-					phase: "beforeWrite",
-					requires: ["computeStyles"],
-				},
-			],
-		});
+		this.reposition();
+	}
+
+	/**
+	 * Desktop: under the anchor, aligned on its left edge, or above the line if it
+	 * doesn't fit. Mobile: full width, right above the anchor (the mobile toolbar).
+	 */
+	private reposition(): void {
+		const anchor = this.inputEl.getBoundingClientRect();
+		const viewportHeight = this.inputEl.win.innerHeight;
+		if (Platform.isMobile) {
+			this.suggestEl.setCssStyles({ bottom: `${viewportHeight - anchor.top}px` });
+			return;
+		}
+		const height = this.suggestEl.offsetHeight;
+		const fitsBelow = anchor.bottom + height <= viewportHeight;
+		const top = fitsBelow
+			? anchor.bottom
+			: Math.max(0, anchor.top - LINE_HEIGHT - height);
+		this.suggestEl.setCssStyles({ left: `${anchor.left}px`, top: `${top}px` });
 	}
 
 	close(): void {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		(<any>this.app).keymap.popScope(this.scope);
+		this.app.keymap.popScope(this.scope);
 
 		this.suggest.setSuggestions([]);
-		this.popper?.destroy();
 		this.suggestEl.detach();
-		this.inputEl.removeEventListener("focus", this.onInputChanged.bind(this));
-		this.inputEl.removeEventListener("blur", this.close.bind(this));
 	}
 
-	getSuggestions(query: string): Fuzzysort.KeysResult<FileOption>[] {
+	getSuggestions(query: string): FileSuggestion[] {
 		this.originalQuery = query;
 		query = removeAccents(query);
 		if (this.settings.limitToFile.length > 0) {
@@ -227,20 +203,19 @@ export class LinkSuggest implements IOwner<Fuzzysort.KeysResult<FileOption>> {
 				this.triggerSymbol,
 				this.originalQuery,
 			);
-		} else {
-			const files = this.app.vault.getFiles();
-			return sharedGetSuggestions(
-				files,
-				query,
-				this.settings,
-				this.app,
-				this.triggerSymbol,
-				this.originalQuery,
-			);
 		}
+		const files = this.app.vault.getFiles();
+		return sharedGetSuggestions(
+			files,
+			query,
+			this.settings,
+			this.app,
+			this.triggerSymbol,
+			this.originalQuery,
+		);
 	}
 
-	renderSuggestion(value: Fuzzysort.KeysResult<FileOption>, el: HTMLElement): void {
+	renderSuggestion(value: FileSuggestion, el: HTMLElement): void {
 		sharedRenderSuggestion(
 			value,
 			el,
@@ -249,15 +224,18 @@ export class LinkSuggest implements IOwner<Fuzzysort.KeysResult<FileOption>> {
 		);
 	}
 
-	async selectSuggestion(value: Fuzzysort.KeysResult<FileOption>): Promise<void> {
-		const linkText = await sharedSelectSuggestion(
+	selectSuggestion(value: FileSuggestion): void {
+		sharedSelectSuggestion(
 			this.app,
 			this.settings,
 			this.triggerSymbol,
 			this.originalQuery,
 			value,
+		).then(
+			(linkText) => this.onSelect(linkText),
+			(error: unknown) =>
+				console.error("Symbol Linking: unable to insert the link", error),
 		);
-		this.onSelect(linkText);
 	}
 }
 

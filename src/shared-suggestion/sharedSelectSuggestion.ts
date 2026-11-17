@@ -1,26 +1,28 @@
 import { type App, Notice, TFile } from "obsidian";
-import type { FileOption } from "src/types";
-import { fileNameNoExtension } from "src/utils/path";
-import { replaceNewFileVars } from "src/utils/replace-new-file-vars";
 import type { CustomSuggester } from "../settings/interface";
+import type { FileSuggestion } from "../types";
+import { fileNameNoExtension } from "../utils/path";
+import { replaceNewFileVars } from "../utils/replace-new-file-vars";
 
 export async function sharedSelectSuggestion(
 	app: App,
 	settings: CustomSuggester,
 	typedChar: string,
 	originalQuery: string,
-	value: Fuzzysort.KeysResult<FileOption>,
+	value: FileSuggestion,
 ): Promise<string> {
+	const option = value.obj;
 	// When user selects "Create new note" option, create the note to link to
-	let linkFile;
-	if (value?.obj?.isCreateNewOption) {
+	let linkFile: TFile | null = null;
+	if (option.isCreateNewOption) {
 		if (settings.limitToFile.length > 0) {
-			const file = app.vault.getAbstractFileByPath(value.obj?.filePath) as TFile;
-			if (!file) {
+			const file = app.vault.getAbstractFileByPath(option.filePath);
+			if (!(file instanceof TFile)) {
 				new Notice(
-					`Unable to get the file at path: ${value.obj.filePath}. Please open an issue on GitHub, as this should not happen.`,
+					`Unable to get the file at path: ${option.filePath}. Please open an issue on GitHub, as this should not happen.`,
 					0,
 				);
+				throw new Error("File not found");
 			}
 			//edit the file and add a new header
 			const headerLevel = "#".repeat(
@@ -39,28 +41,28 @@ export async function sharedSelectSuggestion(
 				const fileTemplate = app.vault.getAbstractFileByPath(
 					`${settings.addNewNoteTemplateFile}.md`,
 				);
-				if (!fileTemplate || !(fileTemplate instanceof TFile)) {
+				if (!(fileTemplate instanceof TFile)) {
 					new Notice(
 						`Unable to get the file at path: ${settings.addNewNoteTemplateFile}. Verify the path in the settings.`,
 					);
 					throw new Error("Template file not found");
 				}
-				newNoteContents = (await app.vault.read(fileTemplate)) || "";
+				newNoteContents = await app.vault.read(fileTemplate);
 				// Use core template settings to replace variables: {{title}}, {{date}}, {{time}}
 				newNoteContents = await replaceNewFileVars(
 					app,
 					newNoteContents,
-					fileNameNoExtension(value.obj?.filePath),
+					fileNameNoExtension(option.filePath),
 				);
 			}
 
 			try {
-				linkFile = await app.vault.create(value.obj?.filePath, newNoteContents);
+				linkFile = await app.vault.create(option.filePath, newNoteContents);
 				// Update the alias to the name for displaying the @ link
-				value.obj.alias = originalQuery;
+				option.alias = originalQuery;
 			} catch (error) {
 				new Notice(
-					`Unable to create new note at path: ${value.obj?.filePath}. Please open an issue on GitHub, https://github.com/Mara-Li/symbol-linking/issues`,
+					`Unable to create new note at path: ${option.filePath}. Please open an issue on GitHub, https://github.com/Mara-Li/symbol-linking/issues`,
 					0,
 				);
 				throw error;
@@ -70,27 +72,28 @@ export async function sharedSelectSuggestion(
 
 	const currentFile = app.workspace.getActiveFile();
 	if (!linkFile) {
-		linkFile = app.vault.getAbstractFileByPath(value.obj?.filePath);
+		const file = app.vault.getAbstractFileByPath(option.filePath);
+		if (file instanceof TFile) linkFile = file;
 	}
-	if (!linkFile || !(linkFile instanceof TFile)) {
+	if (!linkFile) {
 		new Notice(
-			`Unable to get the file at path: ${value.obj?.filePath}. Please open an issue on GitHub, as this should not happen.`,
+			`Unable to get the file at path: ${option.filePath}. Please open an issue on GitHub, as this should not happen.`,
 			0,
 		);
 		throw new Error("File not found");
 	}
-	let alias = value.obj?.originalAlias || "";
+	let alias = option.originalAlias || "";
 	const aliasFallBack =
 		settings.limitToFile.length > 0
-			? (originalQuery ?? value.obj?.fileName)
-			: value.obj?.fileName;
+			? (originalQuery ?? option.fileName)
+			: option.fileName;
 	if (settings.includeSymbol) alias = `${typedChar}${alias || aliasFallBack}`;
 	const linkText =
 		settings.limitToFile.length > 0
 			? app.fileManager.generateMarkdownLink(
 					linkFile,
 					currentFile?.path || "",
-					`#${originalQuery || value.obj?.fileName}`,
+					`#${originalQuery || option.fileName}`,
 					alias,
 				)
 			: app.fileManager.generateMarkdownLink(
@@ -100,8 +103,5 @@ export async function sharedSelectSuggestion(
 					alias,
 				);
 
-	if (linkText.includes("\n")) {
-		return linkText.replace(/\n/g, "");
-	}
-	return linkText;
+	return linkText.replace(/\n/g, "");
 }

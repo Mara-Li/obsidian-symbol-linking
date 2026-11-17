@@ -9,22 +9,17 @@ import {
 } from "./settings/interface";
 import { SettingsTab } from "./settings/settings";
 export default class AtSymbolLinking extends Plugin {
-	settings: CustomSuggester;
+	declare settings: CustomSuggester;
 	reloadingPlugins = false;
-	activeExtensions: any[];
-	_suggestionPopup: SuggestionPopup;
+	activeExtensions: ReturnType<typeof atSymbolTriggerExtension>[] = [];
+	suggestionPopup: SuggestionPopup | null = null;
 
 	async onload() {
-		console.log(`[${this.manifest.id}] Loading plugin`);
 		await this.loadSettings();
 
 		this.addSettingTab(new SettingsTab(this.app, this));
 
 		this.registerPopup();
-	}
-
-	onunload() {
-		console.log(`[${this.manifest.id}] Unloading plugin`);
 	}
 
 	// If compatibility mode is enabled, use the HTML extension-based popup
@@ -40,9 +35,8 @@ export default class AtSymbolLinking extends Plugin {
 				),
 			);
 		} else {
-			this._suggestionPopup = new SuggestionPopup(this.app, this.settings);
-			//@ts-ignore
-			this.registerEditorSuggest(this._suggestionPopup);
+			this.suggestionPopup = new SuggestionPopup(this.app, this.settings);
+			this.registerEditorSuggest(this.suggestionPopup);
 			applyHotKeyHack(this, this.app);
 		}
 	}
@@ -54,22 +48,22 @@ export default class AtSymbolLinking extends Plugin {
 			return;
 		}
 		if (this.reloadingPlugins) return;
-		this.reloadingPlugins = true;
 
-		const plugins = (<any>this.app).plugins;
-		if (!plugins?.enabledPlugins?.has(this.manifest.id)) {
+		const plugins = this.app.plugins;
+		if (!plugins.enabledPlugins.has(this.manifest.id)) {
 			return;
 		}
 
-		await plugins.disablePlugin(this.manifest.id);
+		this.reloadingPlugins = true;
 		try {
-			await new Promise((resolve) => setTimeout(resolve, 100));
+			await plugins.disablePlugin(this.manifest.id);
+			await new Promise((resolve) => window.setTimeout(resolve, 100));
 			await plugins.enablePlugin(this.manifest.id);
 		} catch (error) {
-			/* empty */
+			console.error(`[${this.manifest.id}] Unable to reload the plugin`, error);
+		} finally {
+			this.reloadingPlugins = false;
 		}
-
-		this.reloadingPlugins = false;
 	}
 
 	async convertOldSettings() {
@@ -117,12 +111,7 @@ export default class AtSymbolLinking extends Plugin {
 	}
 
 	updateEditorProcessors() {
-		if (this.activeExtensions?.length) {
-			this.activeExtensions.forEach((extension) => {
-				if (typeof extension?.destroy === "function") {
-					extension.destroy();
-				}
-			});
+		if (this.activeExtensions.length) {
 			this.activeExtensions.length = 0;
 			this.activeExtensions.push(atSymbolTriggerExtension(this.app, this.settings));
 			this.app.workspace.updateOptions();
@@ -133,6 +122,29 @@ export default class AtSymbolLinking extends Plugin {
 		//convert old plugin if exists
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 		await this.convertOldSettings();
+		this.sanitizeSettings();
+	}
+
+	/**
+	 * The setting tab only validates new input: fix values stored by older
+	 * versions (or edited by hand) so the suggester never runs with invalid data.
+	 */
+	sanitizeSettings() {
+		const settings = this.settings;
+		if (settings.triggerSymbol?.length !== 1)
+			settings.triggerSymbol =
+				settings.triggerSymbol?.[0] ?? DEFAULT_SETTINGS.triggerSymbol;
+		const spaces = Number(settings.leavePopupOpenForXSpaces);
+		settings.leavePopupOpenForXSpaces =
+			Number.isInteger(spaces) && spaces >= 0 ? spaces : 0;
+		try {
+			if (!settings.invalidCharacterRegex?.trim()) throw new Error("empty regex");
+			new RegExp(settings.invalidCharacterRegex, settings.invalidCharacterRegexFlags);
+		} catch {
+			settings.invalidCharacterRegex = DEFAULT_SETTINGS.invalidCharacterRegex;
+			settings.invalidCharacterRegexFlags = DEFAULT_SETTINGS.invalidCharacterRegexFlags;
+		}
+		settings._enableOneFile = settings.limitToFile.length > 0;
 	}
 
 	async saveSettings() {
